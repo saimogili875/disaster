@@ -3,47 +3,136 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mogili Sai Kumar</title>
+    <title>Disaster Response AI/Drone Project</title>
     <style>
         body {
             font-family: 'Arial', sans-serif;
-            background-image: url('https://example.com/background.jpg'); /* Replace with a suitable background image */
-            background-size: cover;
-            background-position: center;
+            background-color: #121212;
             color: #fff;
             margin: 0;
             padding: 0;
         }
         .container {
-            text-align: center;
-            padding: 100px 0;
+            padding: 20px;
         }
-        h1 {
-            font-size: 3em;
-            margin-bottom: 20px;
-        }
-        p {
-            font-size: 1.5em;
-            margin-bottom: 40px;
-        }
-        footer {
-            background-color: #333;
-            color: #fff;
-            text-align: center;
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
             padding: 20px 0;
+            text-align: center;
+        }
+        .header h1 {
+            font-size: 2.5em;
+            margin: 0;
+        }
+        .header p {
+            font-size: 1.2em;
+            margin: 10px 0;
+        }
+        .nav {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 10px 0;
+            text-align: center;
+        }
+        .nav a {
+            color: #fff;
+            text-decoration: none;
+            margin: 0 15px;
+            transition: color 0.3s;
+        }
+        .nav a:hover {
+            color: #3498db;
+        }
+        .hero {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
+            padding: 100px 0;
+            text-align: center;
+        }
+        .hero h2 {
+            font-size: 2.5em;
+            margin: 0;
+        }
+        .hero p {
+            font-size: 1.2em;
+            margin: 20px 0;
+        }
+        .features {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            padding: 50px 0;
+        }
+        .feature {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.3s;
+        }
+        .feature:hover {
+            transform: scale(1.05);
+        }
+        .feature svg {
+            width: 50px;
+            height: 50px;
+            margin-bottom: 10px;
+        }
+        .footer {
+            background: #2c3e50;
+            padding: 20px 0;
+            text-align: center;
             position: fixed;
             bottom: 0;
             width: 100%;
         }
+        .footer p {
+            margin: 0;
+        }
+        @media (max-width: 768px) {
+            .features {
+                flex-direction: column;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="container">
+    <div class="header">
         <h1>Mogili Sai Kumar</h1>
-        <p>Welcome to my website!</p>
+        <p>Disaster Response AI/Drone Project</p>
     </div>
-    <footer>
+    <div class="nav">
+        <a href="#home">Home</a>
+        <a href="#features">Features</a>
+        <a href="#contact">Contact</a>
+    </div>
+    <div class="hero" id="home">
+        <h2>Transforming Disaster Response</h2>
+        <p>Our AI-driven drone system provides real-time situational awareness and rapid response capabilities.</p>
+    </div>
+    <div class="features" id="features">
+        <div class="feature">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-globe"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line></svg>
+            <h3>AI Drone Monitoring</h3>
+            <p>Real-time monitoring of drone locations and activities.</p>
+        </div>
+        <div class="feature">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-thermometer"><circle cx="12" cy="12" r="2"></circle><line x1="12" y1="2" x2="12" y2="22"></line></svg>
+            <h3>Thermal Detection</h3>
+            <p>Identify hotspots and areas in need of assistance.</p>
+        </div>
+        <div class="feature">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-bolt"><circle cx="12" cy="12" r="2"></circle><line x1="2" y1="2" x2="22" y2="22"></line><line x1="2" y1="22" x2="22" y2="2"></line></svg>
+            <h3>Disaster Detection</h3>
+            <p>Automatically detect and respond to disasters in real-time.</p>
+        </div>
+        <div class="feature">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-eye"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="1" x2="12" y2="23"></line></svg>
+            <h3>Real-Time Situational Awareness</h3>
+            <p>Get a clear picture of the situation and make informed decisions.</p>
+        </div>
+    </div>
+    <div class="footer" id="contact">
         <p>&copy; 2023 Mogili Sai Kumar. All rights reserved.</p>
-    </footer>
+    </div>
 </body>
 </html>
