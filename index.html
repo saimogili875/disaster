@@ -55,6 +55,38 @@
             font-size: 1.2em;
             margin: 20px 0;
         }
+        .hero button {
+            background: #3498db;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .hero button:hover {
+            background: #2980b9;
+        }
+        .system-status {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            padding: 50px 0;
+        }
+        .status-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.3s;
+        }
+        .status-card:hover {
+            transform: scale(1.05);
+        }
+        .status-card span {
+            font-size: 1.2em;
+            margin: 10px 0;
+        }
         .features {
             display: flex;
             flex-wrap: wrap;
@@ -76,6 +108,30 @@
             width: 50px;
             height: 50px;
             margin-bottom: 10px;
+        }
+        .how-it-works {
+            padding: 50px 0;
+            text-align: center;
+        }
+        .how-it-works h3 {
+            font-size: 1.5em;
+            margin: 0;
+        }
+        .how-it-works p {
+            font-size: 1.2em;
+            margin: 20px 0;
+        }
+        .disaster-section {
+            padding: 50px 0;
+            text-align: center;
+        }
+        .disaster-section h3 {
+            font-size: 1.5em;
+            margin: 0;
+        }
+        .disaster-section p {
+            font-size: 1.2em;
+            margin: 20px 0;
         }
         .footer {
             background: #2c3e50;
@@ -103,11 +159,28 @@
     <div class="nav">
         <a href="#home">Home</a>
         <a href="#features">Features</a>
+        <a href="#how-it-works">How It Works</a>
+        <a href="#disaster-section">Disaster Detection</a>
         <a href="#contact">Contact</a>
     </div>
     <div class="hero" id="home">
         <h2>Transforming Disaster Response</h2>
         <p>Our AI-driven drone system provides real-time situational awareness and rapid response capabilities.</p>
+        <button>Explore System</button>
+    </div>
+    <div class="system-status" id="system-status">
+        <div class="status-card">
+            <span>Drone Status: Online</span>
+        </div>
+        <div class="status-card">
+            <span>AI Detection: Active</span>
+        </div>
+        <div class="status-card">
+            <span>Thermal Sensor: Active</span>
+        </div>
+        <div class="status-card">
+            <span>Mission Status: Ready</span>
+        </div>
     </div>
     <div class="features" id="features">
         <div class="feature">
@@ -130,6 +203,14 @@
             <h3>Real-Time Situational Awareness</h3>
             <p>Get a clear picture of the situation and make informed decisions.</p>
         </div>
+    </div>
+    <div class="how-it-works" id="how-it-works">
+        <h3>How It Works</h3>
+        <p>Drone → RGB/Thermal Sensors → Edge AI → Hazard Detection → Responder Dashboard.</p>
+    </div>
+    <div class="disaster-section" id="disaster-section">
+        <h3>Disaster Detection</h3>
+        <p>Covering Fire, Smoke, Flood Water, Damaged Structures, Exposed Electrical Lines, Debris, Chemical Leaks, Fallen Power Poles, Gas Cylinders, Waterlogged Areas, Blocked Roads, Fallen Trees and other hazards.</p>
     </div>
     <div class="footer" id="contact">
         <p>&copy; 2023 Mogili Sai Kumar. All rights reserved.</p>
