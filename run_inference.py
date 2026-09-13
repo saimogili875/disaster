@@ -5,6 +5,7 @@ import sys
 import cv2
 from ultralytics import YOLO
 from fire_intensity import analyze_fire_intensity
+from class_config import normalize_class_name
 
 def get_class_color(label):
     """Return a distinct BGR color tuple for a given class label."""
@@ -81,7 +82,8 @@ def main():
                     r = box.xyxy[0].astype(int)
                     cls_id = int(box.cls[0])
                     conf_val = float(box.conf[0])
-                    label = model.names[cls_id]
+                    raw_label = model.names[cls_id]
+                    label = normalize_class_name(raw_label)
 
                     summary[label] = summary.get(label, 0) + 1
 

@@ -3,6 +3,7 @@ import cv2
 from django.shortcuts import render
 from django.conf import settings
 from ultralytics import YOLO
+from class_config import normalize_class_name
 from .forms import ImageUploadForm
 from .models import Detection
 
@@ -83,7 +84,8 @@ def upload_and_detect(request):
                             r = box.xyxy[0].astype(float)
                             cls_id = int(box.cls[0])
                             conf = float(box.conf[0])
-                            label = model.names[cls_id]
+                            raw_label = model.names[cls_id]
+                            label = normalize_class_name(raw_label)
 
                             source_type = "hazard" if label in HAZARD_CLASSES else "rgb"
                             summary[label] = summary.get(label, 0) + 1
@@ -148,7 +150,8 @@ def upload_and_detect(request):
                                 r = box.xyxy[0].astype(float)
                                 cls_id = int(box.cls[0])
                                 conf = float(box.conf[0])
-                                label = model.names[cls_id]
+                                raw_label = model.names[cls_id]
+                                label = normalize_class_name(raw_label)
 
                                 source_type = "hazard" if label in HAZARD_CLASSES else "rgb"
                                 summary[label] = summary.get(label, 0) + 1

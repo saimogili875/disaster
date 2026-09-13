@@ -10,10 +10,12 @@ from geolocation import pixel_to_ground
 from fire_intensity import analyze_fire_intensity
 from wind_estimation import estimate_wind_from_region, combine_wind_estimates
 
-# Recognized hazard classes
-HAZARD_CLASSES = {'fire', 'smoke', 'flood', 'flood_water', 'collapsed_building', 'debris', 'fallen_tree', 'power_line', 'fallen_power_pole'}
-VEHICLE_CLASSES = {'vehicle', 'car', 'truck', 'bus', 'motorcycle', 'bicycle'}
-VEGETATION_CLASSES = {'fallen_tree', 'tree', 'potted_plant'}
+from class_config import normalize_class_name, CANONICAL_CLASSES
+
+# Recognized canonical hazard classes
+HAZARD_CLASSES = {'fire', 'smoke', 'flood_water', 'collapsed_building', 'damaged_building', 'debris', 'fallen_tree', 'power_line', 'fallen_power_pole'}
+VEHICLE_CLASSES = {'vehicle_car', 'vehicle_truck', 'vehicle_bus', 'vehicle_motorcycle', 'vehicle_bicycle'}
+VEGETATION_CLASSES = {'fallen_tree'}
 
 CLASS_COLORS = {
     'person': (0, 0, 255),               # Red
@@ -113,7 +115,8 @@ class Command(BaseCommand):
                         r = box.xyxy[0].astype(float)
                         cls_id = int(box.cls[0])
                         conf = float(box.conf[0])
-                        label = model.names[cls_id]
+                        raw_label = model.names[cls_id]
+                        label = normalize_class_name(raw_label)
 
                         track_id = int(box.id[0]) if (box.id is not None and len(box.id) > 0) else None
 
@@ -150,7 +153,7 @@ class Command(BaseCommand):
                                     direction_str = vector_to_cardinal(dx, dy)
 
                         # 2. Optical Flow for Flood Water
-                        if label in {'flood_water', 'water', 'flood'} and prev_frame is not None:
+                        if label == 'flood_water' and prev_frame is not None:
                             flood_mask = np.zeros((frame_h, frame_w), dtype=np.uint8)
                             x1_i, y1_i = max(0, int(r[0])), max(0, int(r[1]))
                             x2_i, y2_i = min(frame_w, int(r[2])), min(frame_h, int(r[3]))

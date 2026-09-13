@@ -1,13 +1,10 @@
 from .models import Detection, FlightPass, ZoneRiskSnapshot
 from change_tracking import compute_changes
+from class_config import CANONICAL_CLASSES
 
-COCO_ANIMALS = {
-    'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'bird', 'animal'
-}
-
-VEHICLE_CLASSES = {
-    'vehicle', 'car', 'truck', 'bus', 'motorcycle', 'bicycle'
-}
+# Canonical class groupings derived from CANONICAL_CLASSES keys
+CANONICAL_ANIMALS = {cls for cls in CANONICAL_CLASSES if cls in {'dog', 'cat', 'cow', 'horse'}}
+CANONICAL_VEHICLES = {cls for cls in CANONICAL_CLASSES if cls.startswith('vehicle_')}
 
 def generate_report():
     """
@@ -15,7 +12,7 @@ def generate_report():
     Returns a structured dictionary matching the expected schema.
     """
     # 1. Vehicles
-    vehicle_qs = Detection.objects.filter(object_class__in=VEHICLE_CLASSES)
+    vehicle_qs = Detection.objects.filter(object_class__in=CANONICAL_VEHICLES)
 
     stat_ids = vehicle_qs.filter(movement_status='stationary').exclude(track_id=None).values_list('track_id', flat=True).distinct()
     stationary_count = len(stat_ids)
@@ -31,11 +28,11 @@ def generate_report():
     # 2. Damaged Structures
     fully_collapsed = Detection.objects.filter(object_class='collapsed_building', subtype='total_destruction').count()
     if fully_collapsed == 0:
-        fully_collapsed = Detection.objects.filter(object_class__in=['collapsed_building', 'building-total-destruction']).count()
+        fully_collapsed = Detection.objects.filter(object_class='collapsed_building').count()
 
     partially_damaged = Detection.objects.filter(object_class='collapsed_building', subtype='major_damage').count()
     if partially_damaged == 0:
-        partially_damaged = Detection.objects.filter(object_class__in=['building-major-damage', 'building-minor-damage']).count()
+        partially_damaged = Detection.objects.filter(object_class='damaged_building').count()
 
     # 3. Electrical
     power_line_cnt = Detection.objects.filter(object_class='power_line').count()
@@ -60,8 +57,8 @@ def generate_report():
     wind_dir = latest_wind.wind_direction if latest_wind else "N/A"
     wind_beaufort = latest_wind.wind_beaufort_scale if latest_wind else "N/A"
 
-    # 6. Water & Drainage
-    water_qs = Detection.objects.filter(object_class__in=['flood_water', 'water', 'flood'])
+    # 6. Water & Drainage — Single reference to canonical 'flood_water'
+    water_qs = Detection.objects.filter(object_class='flood_water')
     flood_water_cnt = water_qs.count()
 
     flow_qs = water_qs.exclude(flow_direction=None)
@@ -75,7 +72,7 @@ def generate_report():
     person_tids = person_qs.exclude(track_id=None).values_list('track_id', flat=True).distinct()
     person_cnt = len(person_tids) if len(person_tids) > 0 else person_qs.count()
 
-    animal_qs = Detection.objects.filter(object_class__in=COCO_ANIMALS)
+    animal_qs = Detection.objects.filter(object_class__in=CANONICAL_ANIMALS)
     animal_tids = animal_qs.exclude(track_id=None).values_list('track_id', flat=True).distinct()
     animal_cnt = len(animal_tids) if len(animal_tids) > 0 else animal_qs.count()
 

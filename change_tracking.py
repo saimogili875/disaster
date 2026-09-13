@@ -1,4 +1,5 @@
 from detection.models import FlightPass, Detection
+from class_config import CANONICAL_CLASSES
 
 def compute_changes(current_pass_id, previous_pass_id):
     """
@@ -29,13 +30,13 @@ def compute_changes(current_pass_id, previous_pass_id):
     prev_zones = Detection.objects.filter(flight_pass=prev_pass).exclude(zone=None).values_list('zone_id', flat=True).distinct()
     curr_damage_dets = Detection.objects.filter(
         flight_pass=curr_pass,
-        object_class__in=['collapsed_building', 'building-total-destruction', 'building-major-damage']
+        object_class__in=['collapsed_building', 'damaged_building']
     ).exclude(zone_id__in=prev_zones)
     new_damage_count = curr_damage_dets.count()
 
-    # 2. Flood Extent Percentage Change
-    prev_flood_cnt = Detection.objects.filter(flight_pass=prev_pass, object_class__in=['flood_water', 'water', 'flood']).count()
-    curr_flood_cnt = Detection.objects.filter(flight_pass=curr_pass, object_class__in=['flood_water', 'water', 'flood']).count()
+    # 2. Flood Extent Percentage Change (Uses canonical 'flood_water')
+    prev_flood_cnt = Detection.objects.filter(flight_pass=prev_pass, object_class='flood_water').count()
+    curr_flood_cnt = Detection.objects.filter(flight_pass=curr_pass, object_class='flood_water').count()
 
     if prev_flood_cnt > 0:
         pct_change = ((curr_flood_cnt - prev_flood_cnt) / float(prev_flood_cnt)) * 100.0

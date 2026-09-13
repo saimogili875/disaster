@@ -7,6 +7,7 @@ import sys
 import cv2
 import numpy as np
 import yaml
+from class_config import CANONICAL_CLASSES, normalize_class_name
 
 # RescueNet class index mapping
 RESCUENET_RAW_CLASSES = {
@@ -24,15 +25,6 @@ RESCUENET_RAW_CLASSES = {
     11: "pool"
 }
 
-# Target remapping for RescueNet (Dataset A)
-RESCUENET_REMAP = {
-    1: "debris",
-    2: "flood_water",
-    5: "collapsed_building",
-    6: "collapsed_building",
-    10: "fallen_tree"
-}
-
 def parse_args():
     """Parse CLI arguments for merging datasets."""
     parser = argparse.ArgumentParser(description="Merge RescueNet (Dataset A) and Roboflow YOLO (Dataset B) into unified YOLO dataset.")
@@ -47,7 +39,6 @@ def load_dataset_b_classes(dataset_b_path):
     """Load class names from Dataset B's data.yaml file."""
     yaml_path = os.path.join(dataset_b_path, "data.yaml")
     if not os.path.exists(yaml_path):
-        # Check subfolder if present
         yaml_path_sub = os.path.join(dataset_b_path, "data.yml")
         if os.path.exists(yaml_path_sub):
             yaml_path = yaml_path_sub
@@ -60,15 +51,13 @@ def load_dataset_b_classes(dataset_b_path):
 
     names = data.get('names', [])
     if isinstance(names, dict):
-        # Convert dict {0: 'fire', 1: 'smoke'} to list ordered by index key
         sorted_keys = sorted(names.keys())
         names = [names[k] for k in sorted_keys]
     return names
 
 def process_dataset_a(dataset_a_path, min_area, unified_class_to_id):
     """
-    Process RescueNet mask files, find contours per class, and convert to YOLO bounding boxes.
-    Returns a list of samples: [{'image_path': ..., 'labels': [(cls_id, cx, cy, w, h), ...]}]
+    Process RescueNet mask files, find contours per class, normalize names, and convert to YOLO bounding boxes.
     """
     images_dir = os.path.join(dataset_a_path, "images")
     masks_dir = os.path.join(dataset_a_path, "masks")
@@ -87,9 +76,8 @@ def process_dataset_a(dataset_a_path, min_area, unified_class_to_id):
         img_path = os.path.join(images_dir, img_name)
         base_name = os.path.splitext(img_name)[0]
 
-        # Match mask file with same basename (checking png, jpg, etc.)
         mask_path = None
-        for ext in ('.png', '.jpg', '.png'):
+        for ext in ('.png', '.jpg'):
             candidate = os.path.join(masks_dir, base_name + ext)
             if os.path.exists(candidate):
                 mask_path = candidate
@@ -105,11 +93,16 @@ def process_dataset_a(dataset_a_path, min_area, unified_class_to_id):
         img_h, img_w = mask.shape[:2]
         labels = []
 
-        # Find contours for each target RescueNet class
-        for raw_cls_id, target_cls_name in RESCUENET_REMAP.items():
-            unified_cls_id = unified_class_to_id[target_cls_name]
+        for raw_cls_id, raw_name in RESCUENET_RAW_CLASSES.items():
+            if raw_cls_id == 0 or raw_name in ("background", "road-clear", "road-blocked", "pool"):
+                continue
 
-            # Binary mask for current class ID
+            canonical_name = normalize_class_name(raw_name)
+            if canonical_name not in unified_class_to_id:
+                continue
+
+            unified_cls_id = unified_class_to_id[canonical_name]
+
             binary_mask = (mask == raw_cls_id).astype(np.uint8)
             if not np.any(binary_mask):
                 continue
@@ -119,7 +112,6 @@ def process_dataset_a(dataset_a_path, min_area, unified_class_to_id):
                 area = cv2.contourArea(cnt)
                 if area >= min_area:
                     x, y, w, h = cv2.boundingRect(cnt)
-                    # Convert pixel bounding rect to normalized YOLO format
                     cx = (x + w / 2.0) / img_w
                     cy = (y + h / 2.0) / img_h
                     norm_w = w / img_w
@@ -137,13 +129,11 @@ def process_dataset_a(dataset_a_path, min_area, unified_class_to_id):
 
 def process_dataset_b(dataset_b_path, b_class_names, unified_class_to_id):
     """
-    Process Roboflow YOLO dataset files, remapping class IDs to the unified class list.
-    Returns a list of samples: [{'image_path': ..., 'labels': [(cls_id, cx, cy, w, h), ...]}]
+    Process Roboflow YOLO dataset files, normalizing class names to canonical classes.
     """
     images_dir = os.path.join(dataset_b_path, "images")
     labels_dir = os.path.join(dataset_b_path, "labels")
 
-    # Handle nested train/val folders in Dataset B if present
     img_files = []
     if os.path.exists(images_dir):
         for root, _, files in os.walk(images_dir):
@@ -161,7 +151,6 @@ def process_dataset_b(dataset_b_path, b_class_names, unified_class_to_id):
         filename = os.path.basename(img_path)
         base_name = os.path.splitext(filename)[0]
 
-        # Locate corresponding label text file
         label_file = None
         if os.path.exists(labels_dir):
             for root, _, files in os.walk(labels_dir):
@@ -179,9 +168,10 @@ def process_dataset_b(dataset_b_path, b_class_names, unified_class_to_id):
                         cx, cy, w, h = map(float, parts[1:5])
 
                         if orig_cls_id < len(b_class_names):
-                            cls_name = b_class_names[orig_cls_id]
-                            if cls_name in unified_class_to_id:
-                                unified_cls_id = unified_class_to_id[cls_name]
+                            raw_name = b_class_names[orig_cls_id]
+                            canonical_name = normalize_class_name(raw_name)
+                            if canonical_name in unified_class_to_id:
+                                unified_cls_id = unified_class_to_id[canonical_name]
                                 labels.append((unified_cls_id, cx, cy, w, h))
 
         samples.append({
@@ -196,34 +186,22 @@ def process_dataset_b(dataset_b_path, b_class_names, unified_class_to_id):
 def main():
     args = parse_args()
 
-    # Define unified class list order
-    # Dataset A target classes first: debris, flood_water, collapsed_building, fallen_tree
-    dataset_a_target_classes = ["debris", "flood_water", "collapsed_building", "fallen_tree"]
-
-    # Load Dataset B class names from data.yaml
-    b_class_names = load_dataset_b_classes(args.dataset_b)
-
-    # Build full list of unified class names
-    unified_classes = list(dataset_a_target_classes)
-    for b_cls in b_class_names:
-        if b_cls not in unified_classes:
-            unified_classes.append(b_cls)
-
-    # Create mapping from class name to unified ID
+    # Use CANONICAL_CLASSES order for dataset configuration
+    unified_classes = list(CANONICAL_CLASSES.keys())
     unified_class_to_id = {cls_name: i for i, cls_name in enumerate(unified_classes)}
 
-    print("Unified Class Mapping:")
+    print("Canonical Class Mapping:")
     for idx, name in enumerate(unified_classes):
         print(f"  ID {idx}: {name}")
 
-    # Process Dataset A and Dataset B
+    b_class_names = load_dataset_b_classes(args.dataset_b)
+
     samples_a = process_dataset_a(args.dataset_a, args.min_area, unified_class_to_id)
     samples_b = process_dataset_b(args.dataset_b, b_class_names, unified_class_to_id)
 
     all_samples = samples_a + samples_b
     print(f"Total merged sample images collected: {len(all_samples)}")
 
-    # Shuffle samples with fixed seed for 85/15 train/val split
     random.seed(args.seed)
     random.shuffle(all_samples)
 
@@ -231,7 +209,6 @@ def main():
     train_samples = all_samples[:split_idx]
     val_samples = all_samples[split_idx:]
 
-    # Prepare output directory structure
     output_dir = os.path.abspath(args.output)
     train_img_dir = os.path.join(output_dir, "images", "train")
     val_img_dir = os.path.join(output_dir, "images", "val")
@@ -241,7 +218,6 @@ def main():
     for d in [train_img_dir, val_img_dir, train_lbl_dir, val_lbl_dir]:
         os.makedirs(d, exist_ok=True)
 
-    # Tracking instance counts for final summary table
     stats = {
         'train': {'images': 0, 'instances': {cls_name: 0 for cls_name in unified_classes}},
         'val': {'images': 0, 'instances': {cls_name: 0 for cls_name in unified_classes}}
@@ -249,15 +225,12 @@ def main():
 
     def write_dataset_split(samples, img_dest_dir, lbl_dest_dir, split_key):
         for idx, sample in enumerate(samples):
-            # Form unique filename to avoid collision between datasets
             ext = os.path.splitext(sample['filename'])[1]
             unique_name = f"{sample['source'].replace(' ', '_').lower()}_{idx:06d}{ext}"
 
-            # Copy image file
             dst_img_path = os.path.join(img_dest_dir, unique_name)
             shutil.copy2(sample['image_path'], dst_img_path)
 
-            # Write YOLO label file
             txt_name = os.path.splitext(unique_name)[0] + ".txt"
             dst_lbl_path = os.path.join(lbl_dest_dir, txt_name)
 
@@ -273,7 +246,6 @@ def main():
     write_dataset_split(train_samples, train_img_dir, train_lbl_dir, 'train')
     write_dataset_split(val_samples, val_img_dir, val_lbl_dir, 'val')
 
-    # Generate data.yaml in output directory
     data_yaml_content = {
         'path': output_dir,
         'train': 'images/train',
@@ -286,7 +258,6 @@ def main():
         yaml.dump(data_yaml_content, f, default_flow_style=False, sort_keys=False)
     print(f"Generated dataset configuration file at '{yaml_output_path}'.")
 
-    # Print summary table at the end
     print("\n" + "=" * 65)
     print(f"{'Dataset Split & Summary':^65}")
     print("=" * 65)
