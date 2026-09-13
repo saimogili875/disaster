@@ -1,4 +1,5 @@
-from .models import Detection, ZoneRiskSnapshot
+from .models import Detection, FlightPass, ZoneRiskSnapshot
+from change_tracking import compute_changes
 
 COCO_ANIMALS = {
     'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'bird', 'animal'
@@ -10,7 +11,7 @@ VEHICLE_CLASSES = {
 
 def generate_report():
     """
-    Query Detection and pre-computed ZoneRiskSnapshot records to compile structured disaster response summary report.
+    Query Detection, FlightPass, and pre-computed ZoneRiskSnapshot records to compile structured disaster report.
     Returns a structured dictionary matching the expected schema.
     """
     # 1. Vehicles
@@ -77,6 +78,18 @@ def generate_report():
     animal_qs = Detection.objects.filter(object_class__in=COCO_ANIMALS)
     animal_tids = animal_qs.exclude(track_id=None).values_list('track_id', flat=True).distinct()
     animal_cnt = len(animal_tids) if len(animal_tids) > 0 else animal_qs.count()
+
+    # 8. Change Analysis across recent FlightPasses
+    completed_passes = FlightPass.objects.filter(status='completed').order_by('-start_time')[:2]
+    if len(completed_passes) == 2:
+        change_data = compute_changes(completed_passes[0].id, completed_passes[1].id)
+    else:
+        change_data = {
+            "note": "Insufficient completed flight passes (at least 2 completed passes required for change tracking)",
+            "new_damage": 0,
+            "flood_extent_change": "0.0%",
+            "fire_spread_rate": "0.00 detections/min"
+        }
 
     # Priority Zones (Query pre-computed ZoneRiskSnapshot per zone)
     snapshots = ZoneRiskSnapshot.objects.select_related('zone', 'flight_pass').order_by('-computed_at')
@@ -150,6 +163,7 @@ def generate_report():
             "animal_count": animal_cnt,
             "aggressive_behavior_flag": "Not available — behavior classification requires video-based action recognition, out of current scope"
         },
+        "change_analysis": change_data,
         "priority_zones": priority_zones
     }
 

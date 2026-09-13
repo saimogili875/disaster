@@ -62,6 +62,34 @@
             color: #475569;
             width: 40%;
         }
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+        .badge-safe {
+            background-color: #dcfce7;
+            color: #15803d;
+            border: 1px solid #86efac;
+        }
+        .badge-caution {
+            background-color: #fef9c3;
+            color: #a16207;
+            border: 1px solid #fde047;
+        }
+        .badge-high-risk {
+            background-color: #ffedd5;
+            color: #c2410c;
+            border: 1px solid #fdba74;
+        }
+        .badge-danger {
+            background-color: #fee2e2;
+            color: #b91c1c;
+            border: 1px solid #fca5a5;
+        }
         pre {
             background-color: #0f172a;
             color: #38bdf8;
@@ -259,6 +287,75 @@
                     </td>
                 </tr>
             </table>
+        </div>
+
+        <!-- Multi-Pass Change Analysis -->
+        <div class="category-card">
+            <h2>Comparative Change Analysis Across Passes</h2>
+            <table>
+                {% if report.change_analysis.note %}
+                <tr>
+                    <th>Status</th>
+                    <td><em>{{ report.change_analysis.note }}</em></td>
+                </tr>
+                {% else %}
+                <tr>
+                    <th>New Structural Damage Count</th>
+                    <td>{{ report.change_analysis.new_damage }}</td>
+                </tr>
+                <tr>
+                    <th>Flood Extent Change</th>
+                    <td>{{ report.change_analysis.flood_extent_change }}</td>
+                </tr>
+                <tr>
+                    <th>Fire Spread Rate</th>
+                    <td>{{ report.change_analysis.fire_spread_rate }}</td>
+                </tr>
+                {% endif %}
+            </table>
+        </div>
+
+        <!-- Priority Zones Assessment -->
+        <div class="category-card">
+            <h2>Pre-Computed Priority Risk Zones</h2>
+            {% if report.priority_zones %}
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width:20%">Zone ID</th>
+                        <th style="width:20%">Center (Lat, Lon)</th>
+                        <th style="width:15%">Risk Score</th>
+                        <th style="width:20%">Risk Label</th>
+                        <th style="width:15%">Detections</th>
+                        <th style="width:10%">Pass ID</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for z in report.priority_zones %}
+                    <tr>
+                        <td>{{ z.zone_id }}</td>
+                        <td>{{ z.center_lat }}, {{ z.center_lon }}</td>
+                        <td>{{ z.risk_score }}</td>
+                        <td>
+                            {% if z.risk_label == 'SAFE' or z.risk_label == 'low' %}
+                                <span class="badge badge-safe">SAFE</span>
+                            {% elif z.risk_label == 'CAUTION' or z.risk_label == 'medium' %}
+                                <span class="badge badge-caution">CAUTION</span>
+                            {% elif z.risk_label == 'HIGH-RISK' or z.risk_label == 'high' %}
+                                <span class="badge badge-high-risk">HIGH-RISK</span>
+                            {% else %}
+                                <span class="badge badge-danger">DANGER</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ z.detection_count }}</td>
+                        <td>{{ z.flight_pass_id }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p>No pre-computed zone risk snapshots available. Run <code>python manage.py close_pass</code> after completing a flight pass to generate batch risk snapshots.</p>
+            {% endif %}
         </div>
 
         <!-- 7. Roads & Routes -->

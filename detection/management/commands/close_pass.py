@@ -19,22 +19,31 @@ HAZARD_WEIGHTS = {
 }
 
 def compute_zone_risk_score(detections_qs):
-    """Calculate aggregate risk score, risk label, and confidence level for a set of detections."""
+    """
+    Calculate aggregate risk score, 4-tier risk label (SAFE/CAUTION/HIGH-RISK/DANGER),
+    and confidence level for a set of zone detections.
+
+    Note: Any existing ZoneRiskSnapshot records created prior to this update retain their
+    historical labels until re-evaluated in subsequent close_pass runs.
+    """
     count = detections_qs.count()
     if count == 0:
-        return 0.0, "low", "low"
+        return 0.0, "SAFE", "low"
 
     total_score = 0.0
     for d in detections_qs:
         weight = HAZARD_WEIGHTS.get(d.object_class, 1.0)
         total_score += weight * d.confidence
 
+    # 4-Tier Risk Classification
     if total_score < 3.0:
-        risk_label = "low"
+        risk_label = "SAFE"
     elif total_score < 8.0:
-        risk_label = "medium"
+        risk_label = "CAUTION"
+    elif total_score < 15.0:
+        risk_label = "HIGH-RISK"
     else:
-        risk_label = "high"
+        risk_label = "DANGER"
 
     if count >= 5:
         confidence_label = "high"
@@ -46,7 +55,7 @@ def compute_zone_risk_score(detections_qs):
     return total_score, risk_label, confidence_label
 
 class Command(BaseCommand):
-    help = "Close active FlightPass, aggregate batch statistics, and compute ZoneRiskSnapshot records."
+    help = "Close active FlightPass, aggregate batch statistics, and compute 4-tier ZoneRiskSnapshot records."
 
     def add_arguments(self, parser):
         parser.add_argument('--pass-id', type=int, default=None, help='Specific FlightPass ID to close')
@@ -75,7 +84,6 @@ class Command(BaseCommand):
         # Find all zones touched by detections in this flight pass
         pass_detections = Detection.objects.filter(flight_pass=flight_pass)
         if not pass_detections.exists():
-            # Fallback to all unassigned detections if pass_id was not explicitly populated
             pass_detections = Detection.objects.filter(flight_pass=None)
 
         touched_zone_ids = pass_detections.exclude(zone=None).values_list('zone_id', flat=True).distinct()
