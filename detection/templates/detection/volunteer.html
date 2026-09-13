@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Volunteer Zone Guide</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        .vol-header {
+            padding: 16px 24px;
+            background: #1e293b;
+            border-bottom: 2px solid #334155;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .vol-header h1 {
+            font-size: 1.2rem;
+            color: #f1f5f9;
+        }
+        .vol-header .nav-link {
+            color: #38bdf8;
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .summary-bar {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            padding: 16px;
+            background: #1e293b;
+        }
+        .summary-chip {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+        .summary-chip .dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .zone-list {
+            max-width: 600px;
+            margin: 20px auto;
+            padding: 0 16px;
+        }
+
+        .zone-card {
+            background: #1e293b;
+            border: 2px solid #334155;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            overflow: hidden;
+            transition: transform 0.1s;
+        }
+        .zone-card:active {
+            transform: scale(0.98);
+        }
+
+        .zone-card-top {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 20px;
+        }
+
+        .status-light {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .status-light.green { background: #22c55e; box-shadow: 0 0 12px rgba(34, 197, 94, 0.4); }
+        .status-light.yellow { background: #eab308; box-shadow: 0 0 12px rgba(234, 179, 8, 0.4); }
+        .status-light.red { background: #ef4444; box-shadow: 0 0 12px rgba(239, 68, 68, 0.4); animation: pulse-red 2s infinite; }
+
+        @keyframes pulse-red {
+            0%, 100% { box-shadow: 0 0 12px rgba(239, 68, 68, 0.4); }
+            50% { box-shadow: 0 0 24px rgba(239, 68, 68, 0.7); }
+        }
+
+        .status-icon {
+            font-size: 1.4rem;
+            color: white;
+            font-weight: 800;
+        }
+
+        .zone-info {
+            flex: 1;
+        }
+        .zone-name {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            font-weight: 600;
+        }
+        .zone-instruction {
+            font-size: 1.1rem;
+            font-weight: 800;
+            margin-top: 2px;
+        }
+
+        .zone-detail {
+            padding: 0 20px 14px 84px;
+            font-size: 0.82rem;
+            color: #94a3b8;
+            line-height: 1.5;
+        }
+
+        .people-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+            padding: 2px 10px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin-top: 4px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #64748b;
+        }
+        .empty-state .icon {
+            font-size: 3rem;
+            margin-bottom: 12px;
+        }
+
+        .vol-footer {
+            text-align: center;
+            padding: 20px;
+            font-size: 0.75rem;
+            color: #475569;
+        }
+    </style>
+</head>
+<body>
+    <div class="vol-header">
+        <h1>VOLUNTEER ZONE GUIDE</h1>
+        <a class="nav-link" href="/dashboard/">Full Dashboard</a>
+    </div>
+
+    <div class="summary-bar">
+        <div class="summary-chip">
+            <div class="dot" style="background:#22c55e"></div>
+            <span>{{ safe_count }} Safe</span>
+        </div>
+        <div class="summary-chip">
+            <div class="dot" style="background:#eab308"></div>
+            <span>{{ caution_count }} Caution</span>
+        </div>
+        <div class="summary-chip">
+            <div class="dot" style="background:#ef4444"></div>
+            <span>{{ danger_count }} Danger</span>
+        </div>
+    </div>
+
+    <div class="zone-list">
+        {% if zones %}
+            {% for zone in zones %}
+            <div class="zone-card" style="border-left: 4px solid {{ zone.color }}">
+                <div class="zone-card-top">
+                    <div class="status-light {{ zone.status }}">
+                        <span class="status-icon">
+                            {% if zone.status == "green" %}
+                                &#10003;
+                            {% elif zone.status == "yellow" %}
+                                !
+                            {% else %}
+                                &#10007;
+                            {% endif %}
+                        </span>
+                    </div>
+                    <div class="zone-info">
+                        <div class="zone-name">Zone {{ zone.zone_id }}</div>
+                        <div class="zone-instruction" style="color:{{ zone.color }}">{{ zone.instruction }}</div>
+                    </div>
+                </div>
+                <div class="zone-detail">
+                    {{ zone.detail }}
+                    {% if zone.people_count > 0 %}
+                        <br>
+                        <span class="people-badge">{{ zone.people_count }} people last detected</span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state">
+                <div class="icon">&#128225;</div>
+                <p>No zone data available yet.</p>
+                <p style="margin-top:8px">Waiting for drone survey results...</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="vol-footer">
+        Data updates automatically after each drone scan. When in doubt, DO NOT approach.
+    </div>
+</body>
+</html>

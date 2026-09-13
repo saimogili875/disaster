@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mission Brief — Zone {{ zone.zone_id }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+
+        .mission-header {
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 3px solid {{ risk_color }};
+            background: #1e293b;
+        }
+        .mission-header h1 {
+            font-size: 1.1rem;
+            color: #f1f5f9;
+        }
+        .mission-header .back-link {
+            color: #38bdf8;
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .risk-banner {
+            background: {{ risk_color }};
+            color: white;
+            text-align: center;
+            padding: 20px;
+        }
+        .risk-banner .zone-name {
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+        }
+        .risk-banner .risk-label {
+            font-size: 2.2rem;
+            font-weight: 800;
+            margin: 4px 0;
+        }
+        .risk-banner .risk-score {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+
+        .mission-body {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .section {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 8px;
+            margin-bottom: 14px;
+            overflow: hidden;
+        }
+        .section-header {
+            padding: 10px 16px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #94a3b8;
+            border-bottom: 1px solid #334155;
+        }
+        .section-body {
+            padding: 14px 16px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 0;
+        }
+        .stat-label {
+            color: #94a3b8;
+            font-size: 0.85rem;
+        }
+        .stat-val {
+            font-weight: 700;
+            font-size: 0.95rem;
+        }
+
+        .hazard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .hazard-chip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 6px;
+            background: #0f172a;
+            border: 1px solid #334155;
+            font-size: 0.85rem;
+        }
+        .hazard-chip.active {
+            border-color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+        }
+        .hazard-chip.inactive {
+            opacity: 0.4;
+        }
+        .hazard-icon {
+            font-size: 1.2rem;
+        }
+
+        .approach-box {
+            text-align: center;
+            padding: 16px;
+        }
+        .approach-direction {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #22c55e;
+        }
+        .approach-note {
+            font-size: 0.82rem;
+            color: #94a3b8;
+            margin-top: 4px;
+        }
+
+        .warning-box {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid #ef4444;
+            border-radius: 6px;
+            padding: 12px 16px;
+            margin-bottom: 14px;
+        }
+        .warning-box .warning-title {
+            color: #ef4444;
+            font-weight: 700;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+        .warning-box ul {
+            margin: 0;
+            padding-left: 18px;
+            font-size: 0.85rem;
+            line-height: 1.6;
+        }
+
+        .route-box {
+            padding: 14px 16px;
+        }
+        .route-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        .route-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        .route-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .confidence-bar {
+            width: 100%;
+            height: 8px;
+            background: #334155;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 6px;
+        }
+        .confidence-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+
+        .infra-list {
+            list-style: none;
+            padding: 0;
+        }
+        .infra-list li {
+            padding: 6px 0;
+            border-bottom: 1px solid #1e293b;
+            font-size: 0.85rem;
+        }
+        .infra-list li:last-child {
+            border-bottom: none;
+        }
+
+        .text-brief {
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: #cbd5e1;
+            padding: 14px 16px;
+            background: #0f172a;
+            border-radius: 6px;
+            margin-bottom: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="mission-header">
+        <h1>MISSION BRIEF</h1>
+        <a class="back-link" href="/dashboard/">Dashboard</a>
+    </div>
+
+    <div class="risk-banner">
+        <div class="zone-name">ZONE {{ zone.zone_id }}</div>
+        <div class="risk-label">{{ risk_label }}</div>
+        <div class="risk-score">Priority Score: {{ risk_score }} / 1.00</div>
+    </div>
+
+    <div class="mission-body">
+        <!-- AI Situation Summary -->
+        <div class="text-brief">
+            {{ situation_summary }}
+        </div>
+
+        <!-- Warnings -->
+        {% if warnings %}
+        <div class="warning-box">
+            <div class="warning-title">Warnings</div>
+            <ul>
+                {% for w in warnings %}
+                <li>{{ w }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <!-- People -->
+        <div class="section">
+            <div class="section-header">People &amp; Animals</div>
+            <div class="section-body">
+                <div class="stat-row">
+                    <span class="stat-label">People detected</span>
+                    <span class="stat-val" style="color:#ef4444">{{ people_count }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Animals detected</span>
+                    <span class="stat-val">{{ animal_count }}</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Last observed</span>
+                    <span class="stat-val">{{ last_person_seen }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hazards -->
+        <div class="section">
+            <div class="section-header">Active Hazards</div>
+            <div class="section-body">
+                <div class="hazard-grid">
+                    <div class="hazard-chip {{ fire_status }}">
+                        <span class="hazard-icon">F</span>
+                        <span>Fire: {{ fire_level }}</span>
+                    </div>
+                    <div class="hazard-chip {{ flood_status }}">
+                        <span class="hazard-icon">W</span>
+                        <span>Flood: {{ flood_level }}</span>
+                    </div>
+                    <div class="hazard-chip {{ electrical_status }}">
+                        <span class="hazard-icon">E</span>
+                        <span>Electrical: {{ electrical_level }}</span>
+                    </div>
+                    <div class="hazard-chip {{ structure_status }}">
+                        <span class="hazard-icon">S</span>
+                        <span>Structure: {{ structure_level }}</span>
+                    </div>
+                    <div class="hazard-chip {{ debris_status }}">
+                        <span class="hazard-icon">D</span>
+                        <span>Debris: {{ debris_level }}</span>
+                    </div>
+                    <div class="hazard-chip {{ chemical_status }}">
+                        <span class="hazard-icon">C</span>
+                        <span>Chemical: {{ chemical_level }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Approach -->
+        <div class="section">
+            <div class="section-header">Recommended Approach</div>
+            <div class="approach-box">
+                <div class="approach-direction">{{ approach_direction }}</div>
+                <div class="approach-note">{{ approach_reason }}</div>
+            </div>
+        </div>
+
+        <!-- Route -->
+        <div class="section">
+            <div class="section-header">Access Route</div>
+            <div class="route-box">
+                {% for route in routes %}
+                <div class="route-status">
+                    <div class="route-dot" style="background:{% if route.status == 'safe_alternate' %}#22c55e{% elif route.status == 'partial' %}#eab308{% else %}#ef4444{% endif %}"></div>
+                    <span class="route-name">{{ route.label }}</span>
+                </div>
+                {% empty %}
+                <div style="color:#64748b;font-size:0.85rem">No pre-computed routes. Use the live map for navigation.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Infrastructure -->
+        {% if infrastructure %}
+        <div class="section">
+            <div class="section-header">Nearby Infrastructure</div>
+            <div class="section-body">
+                <ul class="infra-list">
+                    {% for item in infrastructure %}
+                    <li>{{ item.name }} ({{ item.type }})</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Bridges -->
+        {% if bridges %}
+        <div class="section">
+            <div class="section-header">Bridge Status</div>
+            <div class="section-body">
+                {% for b in bridges %}
+                <div class="stat-row">
+                    <span class="stat-label">{{ b.name }}</span>
+                    <span class="stat-val" style="color:{% if b.status == 'passable' %}#22c55e{% elif b.status == 'partially_blocked' %}#eab308{% else %}#ef4444{% endif %}">{{ b.status|upper }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Data Quality -->
+        <div class="section">
+            <div class="section-header">Data Quality</div>
+            <div class="section-body">
+                <div class="stat-row">
+                    <span class="stat-label">Confidence</span>
+                    <span class="stat-val">{{ confidence|upper }}</span>
+                </div>
+                <div class="confidence-bar">
+                    <div class="confidence-fill" style="width:{{ confidence_pct }}%;background:{% if confidence_pct > 70 %}#22c55e{% elif confidence_pct > 40 %}#eab308{% else %}#ef4444{% endif %}"></div>
+                </div>
+                <div class="stat-row" style="margin-top:8px">
+                    <span class="stat-label">Data age</span>
+                    <span class="stat-val">{{ data_age }} min ago</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Detection count</span>
+                    <span class="stat-val">{{ detection_count }}</span>
+                </div>
+                {% if stale %}
+                <div style="margin-top:8px;color:#eab308;font-size:0.82rem;font-weight:600">
+                    DATA IS STALE — RE-SCAN RECOMMENDED
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

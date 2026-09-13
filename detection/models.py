@@ -66,6 +66,55 @@ class Alert(models.Model):
         return f"Alert [{self.severity}] Zone {self.zone.zone_id} — {self.status}"
 
 
+class Team(models.Model):
+    """Rescue team with live GPS tracking for route monitoring and rerouting."""
+    STATUS_CHOICES = [
+        ("standby", "Standby"),
+        ("en_route", "En Route"),
+        ("on_site", "On Site"),
+        ("returning", "Returning"),
+        ("emergency", "Emergency"),
+    ]
+
+    name = models.CharField(max_length=100)
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    assigned_zone = models.ForeignKey(Zone, on_delete=models.SET_NULL, null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="standby")
+    members = models.IntegerField(default=4)
+    last_position_update = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Team {self.name} [{self.status}]"
+
+
+class Mission(models.Model):
+    """Active rescue mission linking a team to a zone with route tracking."""
+    STATUS_CHOICES = [
+        ("planned", "Planned"),
+        ("active", "Active"),
+        ("rerouting", "Rerouting"),
+        ("completed", "Completed"),
+        ("aborted", "Aborted"),
+    ]
+
+    team = models.ForeignKey(Team, on_delete=models.CASCADE)
+    zone = models.ForeignKey(Zone, on_delete=models.CASCADE)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="planned")
+    route_json = models.TextField(blank=True, default="[]")
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    reroute_count = models.IntegerField(default=0)
+    last_route_check = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-started_at']
+
+    def __str__(self):
+        return f"Mission: {self.team.name} -> Zone {self.zone.zone_id} [{self.status}]"
+
+
 class Detection(models.Model):
     # Foreign key references to FlightPass and Zone
     flight_pass = models.ForeignKey(FlightPass, on_delete=models.SET_NULL, null=True, blank=True)

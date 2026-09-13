@@ -194,6 +194,8 @@
             <a href="/map/">Full Map</a>
             <a href="/report/">Report</a>
             <a href="/alerts/">Alerts</a>
+            <a href="/volunteer/" style="color:#22c55e">Volunteer</a>
+            <a href="/teams/">Teams</a>
         </div>
     </div>
 
@@ -319,7 +321,8 @@
             }).bindPopup(
                 '<strong>Zone ' + z.zone_id + '</strong><br>' +
                 'Risk: ' + z.risk_label + ' (' + z.risk_score + ')<br>' +
-                'Detections: ' + z.detection_count
+                'Detections: ' + z.detection_count + '<br>' +
+                '<a href="/mission/' + z.zone_id + '/" style="color:#38bdf8;font-weight:600;font-size:0.85rem">Mission Brief &rarr;</a>'
             ).addTo(map);
 
             bounds.push([lat, lon]);
