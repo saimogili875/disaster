@@ -16,6 +16,7 @@ from priority_scoring import compute_zone_priorities
 from routing import find_safe_route
 from alerts import check_and_create_alerts
 from route_watch import run_route_watch
+from disaster_classifier import classify_all_zones
 
 # Canonical class groupings derived from CANONICAL_CLASSES keys
 CANONICAL_ANIMALS = {cls for cls in CANONICAL_CLASSES if cls in {'dog', 'cat', 'cow', 'horse'}}
@@ -249,6 +250,7 @@ def generate_report():
         "priority_zones": priority_zones,
         "new_alerts": new_alerts,
         "route_watch_actions": run_route_watch(),
+        "zone_classifications": classify_all_zones(),
     }
 
     return report_data

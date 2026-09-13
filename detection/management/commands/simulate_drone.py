@@ -16,7 +16,7 @@ import random
 import time
 from django.core.management.base import BaseCommand
 from django.utils import timezone
-from detection.models import Detection, FlightPass, Zone
+from detection.models import Detection, FlightPass, Zone, Team, Mission
 
 
 DISASTER_SCENARIOS = [
@@ -157,11 +157,18 @@ class Command(BaseCommand):
         if options['reset']:
             det_count = Detection.objects.count()
             zone_count = Zone.objects.count()
+            team_count = Team.objects.count()
+            mission_count = Mission.objects.count()
             Detection.objects.all().delete()
             Zone.objects.all().delete()
             FlightPass.objects.all().delete()
+            Mission.objects.all().delete()
+            Team.objects.all().delete()
+            from detection.models import Alert
+            Alert.objects.all().delete()
             self.stdout.write(self.style.WARNING(
-                f"Reset: deleted {det_count} detections, {zone_count} zones, all flight passes."
+                f"Reset: deleted {det_count} detections, {zone_count} zones, "
+                f"{team_count} teams, {mission_count} missions, all flight passes and alerts."
             ))
 
         flight_pass = FlightPass.objects.create(
@@ -256,9 +263,63 @@ class Command(BaseCommand):
         self.stdout.write(f"  Zones:       {len(zones_created)}")
         self.stdout.write(f"  Area:        {center_lat}, {center_lon}")
         self.stdout.write(self.style.SUCCESS("=" * 50))
+        # Create demo rescue teams
+        TEAM_DEFS = [
+            {"name": "Alpha Team", "members": 5, "status": "en_route"},
+            {"name": "Bravo Team", "members": 4, "status": "on_site"},
+            {"name": "Charlie Team", "members": 6, "status": "standby"},
+            {"name": "Delta Team", "members": 3, "status": "returning"},
+            {"name": "Echo Team", "members": 4, "status": "standby"},
+        ]
+
+        all_zones = list(Zone.objects.all())
+        import json
+
+        teams_created = 0
+        missions_created = 0
+
+        for i, tdef in enumerate(TEAM_DEFS):
+            team_lat = center_lat + random.uniform(-0.008, 0.008)
+            team_lon = center_lon + random.uniform(-0.008, 0.008)
+
+            assigned_zone = None
+            if tdef["status"] in ("en_route", "on_site") and all_zones:
+                assigned_zone = random.choice(all_zones)
+                if tdef["status"] == "on_site":
+                    team_lat = assigned_zone.center_lat + random.uniform(-0.0005, 0.0005)
+                    team_lon = assigned_zone.center_lon + random.uniform(-0.0005, 0.0005)
+
+            team = Team.objects.create(
+                name=tdef["name"],
+                members=tdef["members"],
+                status=tdef["status"],
+                latitude=round(team_lat, 6),
+                longitude=round(team_lon, 6),
+                assigned_zone=assigned_zone,
+            )
+            teams_created += 1
+
+            if assigned_zone and tdef["status"] in ("en_route", "on_site"):
+                route = [
+                    [team_lat, team_lon],
+                    [assigned_zone.center_lat, assigned_zone.center_lon],
+                ]
+                Mission.objects.create(
+                    team=team,
+                    zone=assigned_zone,
+                    status="active",
+                    route_json=json.dumps(route),
+                )
+                missions_created += 1
+
+        self.stdout.write(self.style.SUCCESS(f"  Teams:       {teams_created}"))
+        self.stdout.write(f"  Missions:    {missions_created}")
+        self.stdout.write(self.style.SUCCESS("=" * 50))
         self.stdout.write("")
         self.stdout.write("Next steps:")
         self.stdout.write("  python manage.py runserver")
         self.stdout.write("  Open /dashboard/ or /map/ to see the data")
+        self.stdout.write("  Open /teams/ to see rescue team positions")
+        self.stdout.write("  Open /volunteer/ for volunteer zone guide")
         self.stdout.write("  Open /report/ to see the full situation report")
         self.stdout.write("  Open /alerts/ to see triggered alerts")

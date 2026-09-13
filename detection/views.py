@@ -347,6 +347,14 @@ def dashboard_view(request):
         color = det_colors.get(row['object_class'], '#64748b')
         class_breakdown.append((row['object_class'], row['count'], pct, color))
 
+    from disaster_classifier import classify_all_zones
+    zone_classifications = classify_all_zones()
+
+    disaster_type_counts = {}
+    for zc in zone_classifications:
+        dt = zc["disaster_type"]
+        disaster_type_counts[dt] = disaster_type_counts.get(dt, 0) + 1
+
     context = {
         'report_json': json.dumps(report_data, default=str),
         'total_zones': len(priority_zones),
@@ -357,6 +365,8 @@ def dashboard_view(request):
         'person_count': report_data.get('humans_and_animals', {}).get('person_count', 0),
         'recent_alerts': recent_alerts,
         'class_breakdown': class_breakdown,
+        'zone_classifications': zone_classifications,
+        'disaster_type_counts': disaster_type_counts,
     }
     return render(request, 'detection/dashboard.html', context)
 
@@ -547,6 +557,14 @@ def mission_view(request, zone_id):
         "stale": freshness.get("stale_flag", False),
         "detection_count": det_count,
     }
+
+    from disaster_classifier import classify_zone
+    classification = classify_zone(zone)
+    context["disaster_type"] = classification["disaster_type"]
+    context["disaster_type_color"] = classification["color"]
+    context["disaster_type_icon"] = classification["icon"]
+    context["secondary_type"] = classification["secondary_type"]
+
     return render(request, "detection/mission.html", context)
 
 
