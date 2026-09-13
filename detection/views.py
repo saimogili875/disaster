@@ -31,6 +31,21 @@ def get_class_color(label):
     h = hash(label)
     return ((h & 0xFF), ((h >> 8) & 0xFF), ((h >> 16) & 0xFF))
 
+def check_and_warn_unfinetuned_model(model):
+    """
+    Check if the loaded YOLO model is an un-fine-tuned ground-level COCO model (80 default COCO classes).
+    If so, print a warning to console/logs and return True indicating un-fine-tuned status.
+    """
+    names = getattr(model, 'names', {})
+    is_coco = (len(names) == 80 and names.get(0) == 'person' and names.get(79) == 'toothbrush')
+    if is_coco:
+        print(
+            "WARNING: Using ground-level COCO-trained model on aerial/drone imagery — vehicle and building "
+            "classifications may be unreliable (e.g. rooftops misidentified as vehicles). Fine-tune on aerial "
+            "datasets (RescueNet/AIDER/VisDrone) for accurate results."
+        )
+    return is_coco
+
 def get_yolo_model():
     """Load fine-tuned model if available at runs/detect/train/weights/best.pt; fallback to yolov8n.pt."""
     custom_model_path = os.path.join(settings.BASE_DIR, "runs", "detect", "train", "weights", "best.pt")
@@ -71,6 +86,7 @@ def upload_and_detect(request):
             is_video = ext in video_extensions
 
             model = get_yolo_model()
+            is_coco_model = check_and_warn_unfinetuned_model(model)
             summary = {}
 
             if not is_video:
@@ -86,6 +102,9 @@ def upload_and_detect(request):
                             conf = float(box.conf[0])
                             raw_label = model.names[cls_id]
                             label = normalize_class_name(raw_label)
+
+                            if is_coco_model and label.startswith('vehicle_') and conf < 0.55:
+                                continue
 
                             source_type = "hazard" if label in HAZARD_CLASSES else "rgb"
                             summary[label] = summary.get(label, 0) + 1
@@ -152,6 +171,9 @@ def upload_and_detect(request):
                                 conf = float(box.conf[0])
                                 raw_label = model.names[cls_id]
                                 label = normalize_class_name(raw_label)
+
+                                if is_coco_model and label.startswith('vehicle_') and conf < 0.55:
+                                    continue
 
                                 source_type = "hazard" if label in HAZARD_CLASSES else "rgb"
                                 summary[label] = summary.get(label, 0) + 1

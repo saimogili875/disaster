@@ -26,6 +26,21 @@ def get_class_color(label):
     h = hash(label)
     return ((h & 0xFF), ((h >> 8) & 0xFF), ((h >> 16) & 0xFF))
 
+def check_and_warn_unfinetuned_model(model):
+    """
+    Check if the loaded YOLO model is an un-fine-tuned ground-level COCO model (80 default COCO classes).
+    If so, print a warning to console/logs and return True indicating un-fine-tuned status.
+    """
+    names = getattr(model, 'names', {})
+    is_coco = (len(names) == 80 and names.get(0) == 'person' and names.get(79) == 'toothbrush')
+    if is_coco:
+        print(
+            "WARNING: Using ground-level COCO-trained model on aerial/drone imagery — vehicle and building "
+            "classifications may be unreliable (e.g. rooftops misidentified as vehicles). Fine-tune on aerial "
+            "datasets (RescueNet/AIDER/VisDrone) for accurate results."
+        )
+    return is_coco
+
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="YOLOv8 Drone Video Inference Script for Disaster Response")
@@ -40,6 +55,7 @@ def main():
 
     print(f"Loading YOLOv8 model from '{args.model}'...")
     model = YOLO(args.model)
+    is_coco_model = check_and_warn_unfinetuned_model(model)
 
     cap = cv2.VideoCapture(args.input)
     if not cap.isOpened():
@@ -84,6 +100,9 @@ def main():
                     conf_val = float(box.conf[0])
                     raw_label = model.names[cls_id]
                     label = normalize_class_name(raw_label)
+
+                    if is_coco_model and label.startswith('vehicle_') and conf_val < 0.55:
+                        continue
 
                     summary[label] = summary.get(label, 0) + 1
 

@@ -13,7 +13,7 @@
             padding: 40px 20px;
         }
         .container {
-            max-width: 1000px;
+            max-width: 1100px;
             margin: 0 auto;
             background: #ffffff;
             padding: 30px;
@@ -60,7 +60,7 @@
         th {
             background-color: #f1f5f9;
             color: #475569;
-            width: 40%;
+            width: 35%;
         }
         .badge {
             display: inline-block;
@@ -98,6 +98,10 @@
             overflow-x: auto;
             font-size: 14px;
         }
+        .sub-list {
+            margin: 0;
+            padding-left: 20px;
+        }
     </style>
 </head>
 <body>
@@ -109,6 +113,25 @@
 
         <h1>Disaster Response Situation Report</h1>
 
+        <!-- 0. Survey Coverage -->
+        <div class="category-card">
+            <h2>0. Operational Survey Coverage</h2>
+            <table>
+                <tr>
+                    <th>Zones Scanned</th>
+                    <td>{{ report.survey_coverage.zones_scanned }}</td>
+                </tr>
+                <tr>
+                    <th>Last Flight Pass Time</th>
+                    <td>{{ report.survey_coverage.last_pass_time|default:"No active passes" }}</td>
+                </tr>
+                <tr>
+                    <th>Percentage Area Scanned</th>
+                    <td><strong>{{ report.survey_coverage.pct_area_scanned }}%</strong></td>
+                </tr>
+            </table>
+        </div>
+
         <!-- 1. Vehicles -->
         <div class="category-card">
             <h2>1. Vehicles & Mobility</h2>
@@ -118,10 +141,24 @@
                     <td>{{ report.vehicles.stationary_count }}</td>
                 </tr>
                 <tr>
+                    <th>Trapped or Blocked Vehicles</th>
+                    <td>{{ report.vehicles.trapped_or_blocked_count }}</td>
+                </tr>
+                <tr>
+                    <th>Vehicle Type Breakdown</th>
+                    <td>
+                        <ul class="sub-list">
+                            {% for cls, cnt in report.vehicles.type_breakdown.items %}
+                            <li>{{ cls }}: {{ cnt }}</li>
+                            {% endfor %}
+                        </ul>
+                    </td>
+                </tr>
+                <tr>
                     <th>Moving Vehicles</th>
                     <td>
                         {% if report.vehicles.moving %}
-                            <ul>
+                            <ul class="sub-list">
                                 {% for v in report.vehicles.moving %}
                                 <li>Track ID {{ v.track_id }}: Moving {{ v.direction }}</li>
                                 {% endfor %}
@@ -147,6 +184,10 @@
                     <td>{{ report.damaged_structures.partially_damaged_count }}</td>
                 </tr>
                 <tr>
+                    <th>Structural Damage Density</th>
+                    <td>{{ report.damaged_structures.damage_density_pct }}%</td>
+                </tr>
+                <tr>
                     <th>Structural Measurements</th>
                     <td><em>{{ report.damaged_structures.measurements }}</em></td>
                 </tr>
@@ -170,6 +211,10 @@
                     <td>{{ report.electrical.fallen_pole_detections }}</td>
                 </tr>
                 <tr>
+                    <th>Near-Water Risk Flags</th>
+                    <td>{{ report.electrical.near_water_risk_flags }}</td>
+                </tr>
+                <tr>
                     <th>Line Topology Mapping</th>
                     <td><em>{{ report.electrical.line_topology_mapping }}</em></td>
                 </tr>
@@ -191,6 +236,10 @@
                 <tr>
                     <th>General Debris Detections</th>
                     <td>{{ report.debris.general_debris }}</td>
+                </tr>
+                <tr>
+                    <th>Density Blockage Percentage</th>
+                    <td>{{ report.debris.density_blockage_pct }}%</td>
                 </tr>
             </table>
         </div>
@@ -273,10 +322,18 @@
                     <td>{{ report.water_and_drainage.fast_moving_currents }}</td>
                 </tr>
                 <tr>
+                    <th>Turbidity Flag</th>
+                    <td>{{ report.water_and_drainage.turbidity_flag|upper }}</td>
+                </tr>
+                <tr>
+                    <th>Waterlogging Duration</th>
+                    <td>{{ report.water_and_drainage.waterlogging_duration_minutes }} minutes</td>
+                </tr>
+                <tr>
                     <th>Flow Summary</th>
                     <td>
                         {% if report.water_and_drainage.flow_summary %}
-                            <ul>
+                            <ul class="sub-list">
                                 {% for item in report.water_and_drainage.flow_summary %}
                                 <li>Direction: {{ item.direction }}, Speed: {{ item.speed }}</li>
                                 {% endfor %}
@@ -322,19 +379,18 @@
             <table>
                 <thead>
                     <tr>
-                        <th style="width:20%">Zone ID</th>
-                        <th style="width:20%">Center (Lat, Lon)</th>
+                        <th style="width:15%">Zone ID</th>
                         <th style="width:15%">Risk Score</th>
-                        <th style="width:20%">Risk Label</th>
-                        <th style="width:15%">Detections</th>
-                        <th style="width:10%">Pass ID</th>
+                        <th style="width:15%">Risk Label</th>
+                        <th style="width:15%">Data Freshness</th>
+                        <th style="width:20%">Critical Infra & Bridges</th>
+                        <th style="width:20%">Insights</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for z in report.priority_zones %}
                     <tr>
-                        <td>{{ z.zone_id }}</td>
-                        <td>{{ z.center_lat }}, {{ z.center_lon }}</td>
+                        <td><strong>{{ z.zone_id }}</strong><br><small>({{ z.center_lat }}, {{ z.center_lon }})</small></td>
                         <td>{{ z.risk_score }}</td>
                         <td>
                             {% if z.risk_label == 'SAFE' or z.risk_label == 'low' %}
@@ -347,8 +403,46 @@
                                 <span class="badge badge-danger">DANGER</span>
                             {% endif %}
                         </td>
-                        <td>{{ z.detection_count }}</td>
-                        <td>{{ z.flight_pass_id }}</td>
+                        <td>
+                            Age: {{ z.freshness.age_minutes }} min<br>
+                            {% if z.freshness.stale_flag %}
+                                <span class="badge badge-caution">STALE (>30m)</span>
+                            {% else %}
+                                <span class="badge badge-safe">FRESH</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if z.critical_infrastructure %}
+                                <strong>Infra:</strong>
+                                <ul class="sub-list">
+                                    {% for fac in z.critical_infrastructure %}
+                                    <li>{{ fac.name }} ({{ fac.type }})</li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                            {% if z.bridges %}
+                                <strong>Bridges:</strong>
+                                <ul class="sub-list">
+                                    {% for b in z.bridges %}
+                                    <li>{{ b.name }}: {{ b.status }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% endif %}
+                            {% if not z.critical_infrastructure and not z.bridges %}
+                                None queried
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if z.insights %}
+                                <ul class="sub-list">
+                                    {% for ins in z.insights %}
+                                    <li>{{ ins }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                No zone insights
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -390,6 +484,10 @@
                 <tr>
                     <th>Animal Count (Distinct Tracks)</th>
                     <td>{{ report.humans_and_animals.animal_count }}</td>
+                </tr>
+                <tr>
+                    <th>Crowd Density Flag</th>
+                    <td>{{ report.humans_and_animals.crowd_density_flag|upper }}</td>
                 </tr>
                 <tr>
                     <th>Behavior Classification</th>

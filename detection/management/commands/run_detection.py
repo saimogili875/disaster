@@ -43,6 +43,21 @@ def get_class_color(label):
     h = hash(label)
     return ((h & 0xFF), ((h >> 8) & 0xFF), ((h >> 16) & 0xFF))
 
+def check_and_warn_unfinetuned_model(model):
+    """
+    Check if the loaded YOLO model is an un-fine-tuned ground-level COCO model (80 default COCO classes).
+    If so, print a warning to console/logs and return True indicating un-fine-tuned status.
+    """
+    names = getattr(model, 'names', {})
+    is_coco = (len(names) == 80 and names.get(0) == 'person' and names.get(79) == 'toothbrush')
+    if is_coco:
+        print(
+            "WARNING: Using ground-level COCO-trained model on aerial/drone imagery — vehicle and building "
+            "classifications may be unreliable (e.g. rooftops misidentified as vehicles). Fine-tune on aerial "
+            "datasets (RescueNet/AIDER/VisDrone) for accurate results."
+        )
+    return is_coco
+
 class Command(BaseCommand):
     help = "Unified object tracking, optical flow, fire intensity, wind estimation, and geolocation command."
 
@@ -73,6 +88,7 @@ class Command(BaseCommand):
 
         self.stdout.write(f"Loading YOLO model from {model_path}...")
         model = YOLO(model_path)
+        is_coco_model = check_and_warn_unfinetuned_model(model)
 
         model_class_names = set(model.names.values())
         if not HAZARD_CLASSES.intersection(model_class_names):
@@ -117,6 +133,10 @@ class Command(BaseCommand):
                         conf = float(box.conf[0])
                         raw_label = model.names[cls_id]
                         label = normalize_class_name(raw_label)
+
+                        # Filter false positive vehicle detections on rooftops for un-fine-tuned COCO model
+                        if is_coco_model and label in VEHICLE_CLASSES and conf < 0.55:
+                            continue
 
                         track_id = int(box.id[0]) if (box.id is not None and len(box.id) > 0) else None
 
