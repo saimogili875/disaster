@@ -1,4 +1,4 @@
-from .models import Detection
+from .models import Detection, ZoneRiskSnapshot
 
 COCO_ANIMALS = {
     'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant', 'bear', 'zebra', 'giraffe', 'bird', 'animal'
@@ -10,7 +10,7 @@ VEHICLE_CLASSES = {
 
 def generate_report():
     """
-    Query all Detection records in the database and compile a structured disaster response summary report.
+    Query Detection and pre-computed ZoneRiskSnapshot records to compile structured disaster response summary report.
     Returns a structured dictionary matching the expected schema.
     """
     # 1. Vehicles
@@ -78,6 +78,24 @@ def generate_report():
     animal_tids = animal_qs.exclude(track_id=None).values_list('track_id', flat=True).distinct()
     animal_cnt = len(animal_tids) if len(animal_tids) > 0 else animal_qs.count()
 
+    # Priority Zones (Query pre-computed ZoneRiskSnapshot per zone)
+    snapshots = ZoneRiskSnapshot.objects.select_related('zone', 'flight_pass').order_by('-computed_at')
+    zone_map = {}
+    for s in snapshots:
+        if s.zone_id not in zone_map:
+            zone_map[s.zone_id] = {
+                "zone_id": s.zone.zone_id,
+                "center_lat": s.zone.center_lat,
+                "center_lon": s.zone.center_lon,
+                "risk_score": round(s.risk_score, 2),
+                "risk_label": s.risk_label,
+                "confidence": s.confidence,
+                "detection_count": s.detection_count,
+                "flight_pass_id": s.flight_pass_id
+            }
+
+    priority_zones = sorted(zone_map.values(), key=lambda x: x['risk_score'], reverse=True)
+
     report_data = {
         "vehicles": {
             "stationary_count": stationary_count,
@@ -131,7 +149,8 @@ def generate_report():
             "person_count": person_cnt,
             "animal_count": animal_cnt,
             "aggressive_behavior_flag": "Not available — behavior classification requires video-based action recognition, out of current scope"
-        }
+        },
+        "priority_zones": priority_zones
     }
 
     return report_data
