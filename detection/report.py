@@ -12,10 +12,48 @@ from coverage_tracking import compute_survey_coverage
 from freshness_tracking import compute_zone_freshness
 from infrastructure_layer import fetch_critical_infrastructure
 from bridge_status import evaluate_bridge_status
+from priority_scoring import compute_zone_priorities
+from routing import find_safe_route
+from alerts import check_and_create_alerts
 
 # Canonical class groupings derived from CANONICAL_CLASSES keys
 CANONICAL_ANIMALS = {cls for cls in CANONICAL_CLASSES if cls in {'dog', 'cat', 'cow', 'horse'}}
 CANONICAL_VEHICLES = {cls for cls in CANONICAL_CLASSES if cls.startswith('vehicle_')}
+
+
+def _compute_routes(priority_zones):
+    """Compute safe routes from top priority zones to nearest critical infrastructure."""
+    routes = []
+    blocked_points = []
+
+    # Collect hazard zone centers as blocked points for routing
+    for z in priority_zones:
+        if z.get("risk_label") in ("CRITICAL", "HIGH"):
+            blocked_points.append((z["center_lat"], z["center_lon"]))
+
+    # Route from top 2 priority zones to their nearest infrastructure
+    for zone_dict in priority_zones[:2]:
+        infra_list = zone_dict.get("critical_infrastructure", [])
+        if not infra_list:
+            continue
+        start_lat, start_lon = zone_dict["center_lat"], zone_dict["center_lon"]
+        for infra in infra_list[:1]:
+            end_lat = start_lat + 0.01
+            end_lon = start_lon + 0.01
+            route_coords = find_safe_route(start_lat, start_lon, end_lat, end_lon, blocked_points)
+            if route_coords:
+                routes.append({
+                    "from_zone": zone_dict["zone_id"],
+                    "to": infra.get("name", "facility"),
+                    "route": route_coords,
+                    "status": "safe_alternate",
+                })
+
+    disrupted = len(blocked_points)
+    return {
+        "disrupted_zone_count": disrupted,
+        "suggested_safe_routes": routes,
+    }
 
 def generate_report():
     """
@@ -132,34 +170,19 @@ def generate_report():
     # Global Insights
     all_insights = generate_insights()
 
-    # Priority Zones Assessment & Enrichment
-    snapshots = ZoneRiskSnapshot.objects.select_related('zone', 'flight_pass').order_by('-computed_at')
-    zone_map = {}
-    for s in snapshots:
-        if s.zone_id not in zone_map:
-            freshness_info = compute_zone_freshness(s.computed_at)
-            zone_map[s.zone_id] = {
-                "zone_id": s.zone.zone_id,
-                "center_lat": s.zone.center_lat,
-                "center_lon": s.zone.center_lon,
-                "risk_score": round(s.risk_score, 2),
-                "risk_label": s.risk_label,
-                "confidence": s.confidence,
-                "detection_count": s.detection_count,
-                "flight_pass_id": s.flight_pass_id,
-                "freshness": freshness_info,
-                "insights": all_insights,
-                "critical_infrastructure": [],
-                "bridges": []
-            }
+    # Priority Zones — compute live risk scores for all zones
+    latest_pass = FlightPass.objects.order_by("-start_time").first()
+    priority_zones = compute_zone_priorities(flight_pass=latest_pass)
 
-    priority_zones = sorted(zone_map.values(), key=lambda x: x['risk_score'], reverse=True)
+    # Trigger alerts for CRITICAL/HIGH zones
+    new_alerts = check_and_create_alerts(priority_zones, flight_pass=latest_pass)
 
-    # Attach Critical Infrastructure and Bridge Status to Top 3 Priority Zones
-    for i, zone_dict in enumerate(priority_zones[:3]):
+    # Enrich top 3 priority zones with infrastructure and bridge data
+    for zone_dict in priority_zones[:3]:
         lat, lon = zone_dict["center_lat"], zone_dict["center_lon"]
         zone_dict["critical_infrastructure"] = fetch_critical_infrastructure(lat, lon)
         zone_dict["bridges"] = evaluate_bridge_status(lat, lon)
+        zone_dict["insights"] = all_insights
 
     report_data = {
         "survey_coverage": survey_coverage,
@@ -214,10 +237,7 @@ def generate_report():
             "turbidity_flag": turbidity_flag,
             "waterlogging_duration_minutes": waterlogging_duration_minutes
         },
-        "roads_and_routes": {
-            "disrupted_road_segments": "Populated by calling find_safe_route() from routing.py once start/end points are provided — leave as empty list [] if not called yet",
-            "suggested_safe_routes": []
-        },
+        "roads_and_routes": _compute_routes(priority_zones),
         "humans_and_animals": {
             "person_count": person_cnt,
             "animal_count": animal_cnt,
@@ -225,7 +245,8 @@ def generate_report():
             "aggressive_behavior_flag": "Not available — behavior classification requires video-based action recognition, out of current scope"
         },
         "change_analysis": change_data,
-        "priority_zones": priority_zones
+        "priority_zones": priority_zones,
+        "new_alerts": new_alerts,
     }
 
     return report_data

@@ -38,6 +38,34 @@ class ZoneRiskSnapshot(models.Model):
     def __str__(self):
         return f"ZoneRiskSnapshot {self.zone.zone_id} Pass {self.flight_pass.id} Risk: {self.risk_label} ({self.risk_score:.2f})"
 
+class Alert(models.Model):
+    """Threshold-triggered alert when a zone reaches CRITICAL or HIGH risk."""
+    SEVERITY_CHOICES = [
+        ("CRITICAL", "Critical"),
+        ("HIGH", "High"),
+    ]
+    STATUS_CHOICES = [
+        ("active", "Active"),
+        ("acknowledged", "Acknowledged"),
+        ("resolved", "Resolved"),
+    ]
+
+    zone = models.ForeignKey(Zone, on_delete=models.CASCADE)
+    flight_pass = models.ForeignKey(FlightPass, on_delete=models.SET_NULL, null=True, blank=True)
+    severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES)
+    risk_score = models.FloatField()
+    message = models.TextField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="active")
+    created_at = models.DateTimeField(auto_now_add=True)
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"Alert [{self.severity}] Zone {self.zone.zone_id} — {self.status}"
+
+
 class Detection(models.Model):
     # Foreign key references to FlightPass and Zone
     flight_pass = models.ForeignKey(FlightPass, on_delete=models.SET_NULL, null=True, blank=True)

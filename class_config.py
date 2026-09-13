@@ -42,3 +42,42 @@ def normalize_class_name(raw_name):
 
     print(f"Warning: Class name '{raw_name}' not found in CANONICAL_CLASSES. Returning unchanged.")
     return raw_name
+
+
+CLASS_COLORS = {
+    'person': (0, 0, 255),
+    'fire': (0, 0, 255),
+    'flood_water': (255, 0, 0),
+    'collapsed_building': (0, 165, 255),
+    'debris': (0, 255, 255),
+    'vehicle_car': (0, 255, 0),
+    'vehicle_bicycle': (255, 255, 0),
+    'vehicle_motorcycle': (255, 0, 255),
+    'vehicle_bus': (128, 0, 128),
+    'vehicle_truck': (128, 128, 0),
+    'smoke': (180, 180, 180),
+    'fallen_tree': (0, 128, 0),
+    'fallen_power_pole': (0, 128, 128),
+    'power_line': (128, 128, 128),
+    'gas_cylinder': (0, 0, 128),
+}
+
+
+def get_class_color(label):
+    """Return a distinct BGR color tuple for a given class label."""
+    if label in CLASS_COLORS:
+        return CLASS_COLORS[label]
+    h = hash(label)
+    return ((h & 0xFF), ((h >> 8) & 0xFF), ((h >> 16) & 0xFF))
+
+
+def check_and_warn_unfinetuned_model(model):
+    """Check if the loaded YOLO model is an un-fine-tuned COCO model (80 classes)."""
+    names = getattr(model, 'names', {})
+    is_coco = (len(names) == 80 and names.get(0) == 'person' and names.get(79) == 'toothbrush')
+    if is_coco:
+        print(
+            "WARNING: Using ground-level COCO-trained model on aerial/drone imagery — vehicle and building "
+            "classifications may be unreliable. Fine-tune on aerial datasets for accurate results."
+        )
+    return is_coco

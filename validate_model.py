@@ -8,7 +8,7 @@ from class_config import CANONICAL_CLASSES, normalize_class_name
 def parse_args():
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(description="Validate YOLOv8 model classes against CANONICAL_CLASSES schema.")
-    parser.add_argument('--model', type=str, default="yolov8n.pt", help="Path to YOLOv8 model weights file")
+    parser.add_argument('--model', type=str, default="yolov8m.pt", help="Path to YOLOv8 model weights file")
     parser.add_argument('--data', type=str, default=None, help="Optional path to dataset data.yaml file to check instance counts")
     return parser.parse_args()
 

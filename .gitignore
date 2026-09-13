@@ -1,1 +1,39 @@
+# Byte-compiled / cached
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Database
+db.sqlite3
+db.sqlite3-journal
+
+# Model weights (download or train; don't commit 6MB+ binaries)
+*.pt
+*.onnx
+runs/
+
+# Media uploads and results (generated at runtime)
+media/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Virtual environment
+venv/
+env/
+.env
+
+# Aider
 .aider*
+
+# Duplicate/stale project scaffolds
+config/
+sih/

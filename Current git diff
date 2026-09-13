@@ -1,8 +1,0 @@
-diff --git a/config/settings.py b/config/settings.py
-index 1234567..89abcde 100644
---- a/config/settings.py
-+++ b/config/settings.py
-@@ -3,7 +3,7 @@ INSTALLED_APPS = [
-     ...
-     'detection',
- ]

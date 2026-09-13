@@ -3,55 +3,19 @@ import cv2
 from django.shortcuts import render
 from django.conf import settings
 from ultralytics import YOLO
-from class_config import normalize_class_name
+from class_config import normalize_class_name, get_class_color, check_and_warn_unfinetuned_model
+from thermal_proxy import enhance_low_visibility
 from .forms import ImageUploadForm
-from .models import Detection
+from .models import Detection, Alert
 
-# Hazard classes for categorization
-HAZARD_CLASSES = {'fire', 'flood', 'collapsed_building', 'debris'}
-
-# Predefined colors for detection bounding boxes
-CLASS_COLORS = {
-    'person': (0, 0, 255),               # Red
-    'fire': (0, 0, 255),                 # Red
-    'flood': (255, 0, 0),                # Blue
-    'collapsed_building': (0, 165, 255), # Orange
-    'debris': (0, 255, 255),             # Yellow
-    'car': (0, 255, 0),                  # Green
-    'bicycle': (255, 255, 0),            # Cyan
-    'motorcycle': (255, 0, 255),        # Magenta
-    'bus': (128, 0, 128),                # Purple
-    'truck': (128, 128, 0),              # Olive
-}
-
-def get_class_color(label):
-    """Return specific BGR color for class or fallback to deterministic hash color."""
-    if label in CLASS_COLORS:
-        return CLASS_COLORS[label]
-    h = hash(label)
-    return ((h & 0xFF), ((h >> 8) & 0xFF), ((h >> 16) & 0xFF))
-
-def check_and_warn_unfinetuned_model(model):
-    """
-    Check if the loaded YOLO model is an un-fine-tuned ground-level COCO model (80 default COCO classes).
-    If so, print a warning to console/logs and return True indicating un-fine-tuned status.
-    """
-    names = getattr(model, 'names', {})
-    is_coco = (len(names) == 80 and names.get(0) == 'person' and names.get(79) == 'toothbrush')
-    if is_coco:
-        print(
-            "WARNING: Using ground-level COCO-trained model on aerial/drone imagery — vehicle and building "
-            "classifications may be unreliable (e.g. rooftops misidentified as vehicles). Fine-tune on aerial "
-            "datasets (RescueNet/AIDER/VisDrone) for accurate results."
-        )
-    return is_coco
+HAZARD_CLASSES = {'fire', 'flood_water', 'collapsed_building', 'debris'}
 
 def get_yolo_model():
     """Load fine-tuned model if available at runs/detect/train/weights/best.pt; fallback to yolov8n.pt."""
     custom_model_path = os.path.join(settings.BASE_DIR, "runs", "detect", "train", "weights", "best.pt")
     if os.path.exists(custom_model_path):
         return YOLO(custom_model_path)
-    return YOLO("yolov8n.pt")
+    return YOLO("yolov8m.pt")
 
 def upload_and_detect(request):
     """View handling GET (upload form) and POST (save file, run YOLO inference, render results)."""
@@ -93,7 +57,8 @@ def upload_and_detect(request):
                 # Process Image File
                 image = cv2.imread(upload_path)
                 if image is not None:
-                    results = model(image)
+                    inference_image, _ = enhance_low_visibility(image)
+                    results = model(inference_image)
                     for result in results:
                         boxes = result.boxes.cpu().numpy()
                         for box in boxes:
@@ -144,7 +109,8 @@ def upload_and_detect(request):
                     context['summary'] = summary
                     context['is_video'] = False
             else:
-                # Process Video File frame-by-frame
+                # Process Video File with frame sampling + deduplication
+                SAMPLE_EVERY_N = 5
                 cap = cv2.VideoCapture(upload_path)
                 if cap.isOpened():
                     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -157,50 +123,80 @@ def upload_and_detect(request):
                     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
                     out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
 
+                    frame_idx = 0
+                    prev_class_counts = {}
+                    last_annotations = []
+
                     while True:
                         ret, frame = cap.read()
                         if not ret:
                             break
 
-                        results = model(frame, verbose=False)
-                        for result in results:
-                            boxes = result.boxes.cpu().numpy()
-                            for box in boxes:
-                                r = box.xyxy[0].astype(float)
-                                cls_id = int(box.cls[0])
-                                conf = float(box.conf[0])
-                                raw_label = model.names[cls_id]
-                                label = normalize_class_name(raw_label)
+                        frame_idx += 1
+                        is_sample_frame = (frame_idx % SAMPLE_EVERY_N == 0)
 
-                                if is_coco_model and label.startswith('vehicle_') and conf < 0.55:
-                                    continue
+                        if is_sample_frame:
+                            inference_frame, _ = enhance_low_visibility(frame)
+                            results = model(inference_frame, verbose=False)
+                            current_detections = []
+                            current_class_counts = {}
 
-                                source_type = "hazard" if label in HAZARD_CLASSES else "rgb"
-                                summary[label] = summary.get(label, 0) + 1
+                            for result in results:
+                                boxes = result.boxes.cpu().numpy()
+                                for box in boxes:
+                                    r = box.xyxy[0].astype(float)
+                                    cls_id = int(box.cls[0])
+                                    conf = float(box.conf[0])
+                                    raw_label = model.names[cls_id]
+                                    label = normalize_class_name(raw_label)
 
-                                Detection.objects.create(
-                                    object_class=label,
-                                    confidence=conf,
-                                    bbox_x1=float(r[0]),
-                                    bbox_y1=float(r[1]),
-                                    bbox_x2=float(r[2]),
-                                    bbox_y2=float(r[3]),
-                                    source=source_type
-                                )
+                                    if is_coco_model and label.startswith('vehicle_') and conf < 0.55:
+                                        continue
 
-                                color = get_class_color(label)
-                                p1 = (int(r[0]), int(r[1]))
-                                p2 = (int(r[2]), int(r[3]))
-                                cv2.rectangle(frame, p1, p2, color, 2)
-                                cv2.putText(
-                                    frame,
-                                    f"{label}: {conf:.2f}",
-                                    (p1[0], max(p1[1] - 10, 0)),
-                                    cv2.FONT_HERSHEY_SIMPLEX,
-                                    0.6,
-                                    color,
-                                    2
-                                )
+                                    source_type = "hazard" if label in HAZARD_CLASSES else "rgb"
+                                    summary[label] = summary.get(label, 0) + 1
+                                    current_class_counts[label] = current_class_counts.get(label, 0) + 1
+
+                                    current_detections.append({
+                                        'label': label, 'conf': conf,
+                                        'r': r, 'source': source_type,
+                                    })
+
+                            # Dedup: only write to DB when class counts change
+                            if current_class_counts != prev_class_counts:
+                                for det in current_detections:
+                                    Detection.objects.create(
+                                        object_class=det['label'],
+                                        confidence=det['conf'],
+                                        bbox_x1=float(det['r'][0]),
+                                        bbox_y1=float(det['r'][1]),
+                                        bbox_x2=float(det['r'][2]),
+                                        bbox_y2=float(det['r'][3]),
+                                        source=det['source'],
+                                    )
+                                prev_class_counts = current_class_counts
+
+                            # Cache annotations for non-sample frames
+                            last_annotations = [
+                                (det['label'], det['conf'], det['r'])
+                                for det in current_detections
+                            ]
+
+                        # Draw annotations (use cached for non-sample frames)
+                        for label, conf, r in last_annotations:
+                            color = get_class_color(label)
+                            p1 = (int(r[0]), int(r[1]))
+                            p2 = (int(r[2]), int(r[3]))
+                            cv2.rectangle(frame, p1, p2, color, 2)
+                            cv2.putText(
+                                frame,
+                                f"{label}: {conf:.2f}",
+                                (p1[0], max(p1[1] - 10, 0)),
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                0.6,
+                                color,
+                                2
+                            )
 
                         out.write(frame)
 
@@ -231,4 +227,124 @@ def report_view(request):
         'report_json': json.dumps(report_data, indent=2),
     }
     return render(request, 'detection/report.html', context)
+
+
+def map_view(request):
+    """View rendering a Leaflet-based live disaster map with zone risk overlays and detection markers."""
+    import json
+    from .report import generate_report
+
+    report_data = generate_report()
+
+    detection_markers = []
+    for det in Detection.objects.exclude(latitude=None).exclude(longitude=None).order_by('-timestamp')[:500]:
+        detection_markers.append({
+            'object_class': det.object_class,
+            'confidence': det.confidence,
+            'source': det.source,
+            'lat': det.latitude,
+            'lon': det.longitude,
+        })
+    report_data['_detection_markers'] = detection_markers
+
+    context = {
+        'report_json': json.dumps(report_data, default=str),
+    }
+    return render(request, 'detection/map.html', context)
+
+
+def alerts_view(request):
+    """View listing all triggered alerts, sorted by severity then recency."""
+    alerts = Alert.objects.select_related('zone').all()
+    context = {
+        'alerts': alerts,
+        'critical_count': alerts.filter(severity='CRITICAL', status='active').count(),
+        'high_count': alerts.filter(severity='HIGH', status='active').count(),
+        'active_count': alerts.filter(status='active').count(),
+        'resolved_count': alerts.filter(status='resolved').count(),
+    }
+    return render(request, 'detection/alerts.html', context)
+
+
+def alert_acknowledge(request, alert_id):
+    """POST action to acknowledge an alert."""
+    from django.shortcuts import redirect
+    from django.utils import timezone as tz
+    if request.method == 'POST':
+        alert = Alert.objects.filter(id=alert_id).first()
+        if alert and alert.status == 'active':
+            alert.status = 'acknowledged'
+            alert.acknowledged_at = tz.now()
+            alert.save()
+    return redirect('alerts_view')
+
+
+def alert_resolve(request, alert_id):
+    """POST action to resolve an alert."""
+    from django.shortcuts import redirect
+    if request.method == 'POST':
+        alert = Alert.objects.filter(id=alert_id).first()
+        if alert and alert.status in ('active', 'acknowledged'):
+            alert.status = 'resolved'
+            alert.save()
+    return redirect('alerts_view')
+
+
+def dashboard_view(request):
+    """Command Center Dashboard — unified overview for disaster coordinators."""
+    import json
+    from django.db.models import Count
+    from .report import generate_report
+
+    report_data = generate_report()
+
+    detection_markers = []
+    for det in Detection.objects.exclude(latitude=None).exclude(longitude=None).order_by('-timestamp')[:500]:
+        detection_markers.append({
+            'object_class': det.object_class,
+            'confidence': det.confidence,
+            'source': det.source,
+            'lat': det.latitude,
+            'lon': det.longitude,
+        })
+    report_data['_detection_markers'] = detection_markers
+
+    priority_zones = report_data.get('priority_zones', [])
+    critical_zones = sum(1 for z in priority_zones if z.get('risk_label') == 'CRITICAL')
+    high_zones = sum(1 for z in priority_zones if z.get('risk_label') == 'HIGH')
+
+    recent_alerts = Alert.objects.select_related('zone').filter(
+        status__in=['active', 'acknowledged']
+    ).order_by('-created_at')[:8]
+
+    class_counts = (
+        Detection.objects.values('object_class')
+        .annotate(count=Count('id'))
+        .order_by('-count')[:10]
+    )
+    total_dets = Detection.objects.count()
+    det_colors = {
+        'person': '#ef4444', 'fire': '#f97316', 'smoke': '#94a3b8',
+        'flood_water': '#3b82f6', 'collapsed_building': '#a855f7',
+        'damaged_building': '#d946ef', 'debris': '#eab308',
+        'fallen_tree': '#22c55e', 'vehicle_car': '#06b6d4',
+    }
+    class_breakdown = []
+    for row in class_counts:
+        pct = round((row['count'] / max(1, total_dets)) * 100, 1)
+        color = det_colors.get(row['object_class'], '#64748b')
+        class_breakdown.append((row['object_class'], row['count'], pct, color))
+
+    context = {
+        'report_json': json.dumps(report_data, default=str),
+        'total_zones': len(priority_zones),
+        'critical_zones': critical_zones,
+        'high_zones': high_zones,
+        'total_detections': total_dets,
+        'active_alerts': Alert.objects.filter(status='active').count(),
+        'person_count': report_data.get('humans_and_animals', {}).get('person_count', 0),
+        'recent_alerts': recent_alerts,
+        'class_breakdown': class_breakdown,
+    }
+    return render(request, 'detection/dashboard.html', context)
 
