@@ -189,3 +189,21 @@ def upload_and_detect(request):
         context['form'] = form
 
     return render(request, 'detection/upload.html', context)
+
+def report_view(request):
+    """View to generate and render structured disaster response report (HTML or JSON API)."""
+    import json
+    from django.http import JsonResponse
+    from .report import generate_report
+
+    report_data = generate_report()
+
+    if request.GET.get('format') == 'json' or request.headers.get('Accept') == 'application/json':
+        return JsonResponse(report_data, json_dumps_params={'indent': 2})
+
+    context = {
+        'report': report_data,
+        'report_json': json.dumps(report_data, indent=2),
+    }
+    return render(request, 'detection/report.html', context)
+

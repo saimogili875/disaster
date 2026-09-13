@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Disaster Response Situation Report</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f6f9;
+            color: #333;
+            margin: 0;
+            padding: 40px 20px;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1a252f;
+            margin-top: 0;
+            border-bottom: 2px solid #e2e8f0;
+            padding-bottom: 10px;
+        }
+        .nav-links {
+            margin-bottom: 20px;
+        }
+        .nav-links a {
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 600;
+            margin-right: 15px;
+        }
+        .category-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .category-card h2 {
+            margin-top: 0;
+            color: #1e293b;
+            font-size: 1.25rem;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            text-align: left;
+            padding: 10px 12px;
+            border-bottom: 1px solid #cbd5e1;
+        }
+        th {
+            background-color: #f1f5f9;
+            color: #475569;
+            width: 40%;
+        }
+        pre {
+            background-color: #0f172a;
+            color: #38bdf8;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav-links">
+            <a href="/upload/">&larr; Upload Portal</a>
+            <a href="/report/?format=json" target="_blank">View Raw JSON API &rarr;</a>
+        </div>
+
+        <h1>Disaster Response Situation Report</h1>
+
+        <!-- 1. Vehicles -->
+        <div class="category-card">
+            <h2>1. Vehicles & Mobility</h2>
+            <table>
+                <tr>
+                    <th>Stationary Vehicles Count</th>
+                    <td>{{ report.vehicles.stationary_count }}</td>
+                </tr>
+                <tr>
+                    <th>Moving Vehicles</th>
+                    <td>
+                        {% if report.vehicles.moving %}
+                            <ul>
+                                {% for v in report.vehicles.moving %}
+                                <li>Track ID {{ v.track_id }}: Moving {{ v.direction }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            None detected
+                        {% endif %}
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- 2. Damaged Structures -->
+        <div class="category-card">
+            <h2>2. Damaged Structures</h2>
+            <table>
+                <tr>
+                    <th>Fully Collapsed Structures</th>
+                    <td>{{ report.damaged_structures.fully_collapsed_count }}</td>
+                </tr>
+                <tr>
+                    <th>Partially Damaged Structures</th>
+                    <td>{{ report.damaged_structures.partially_damaged_count }}</td>
+                </tr>
+                <tr>
+                    <th>Structural Measurements</th>
+                    <td><em>{{ report.damaged_structures.measurements }}</em></td>
+                </tr>
+                <tr>
+                    <th>Collapse Risk Prediction</th>
+                    <td><em>{{ report.damaged_structures.collapse_risk_prediction }}</em></td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- 3. Electrical -->
+        <div class="category-card">
+            <h2>3. Electrical Infrastructure</h2>
+            <table>
+                <tr>
+                    <th>Power Line Detections</th>
+                    <td>{{ report.electrical.power_line_detections }}</td>
+                </tr>
+                <tr>
+                    <th>Fallen Power Poles</th>
+                    <td>{{ report.electrical.fallen_pole_detections }}</td>
+                </tr>
+                <tr>
+                    <th>Line Topology Mapping</th>
+                    <td><em>{{ report.electrical.line_topology_mapping }}</em></td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- 4. Debris -->
+        <div class="category-card">
+            <h2>4. Debris & Blockages</h2>
+            <table>
+                <tr>
+                    <th>Fallen Trees</th>
+                    <td>{{ report.debris.fallen_trees }}</td>
+                </tr>
+                <tr>
+                    <th>Fallen Power Poles</th>
+                    <td>{{ report.debris.fallen_poles }}</td>
+                </tr>
+                <tr>
+                    <th>General Debris Detections</th>
+                    <td>{{ report.debris.general_debris }}</td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- 5. Chemical & Gases -->
+        <div class="category-card">
+            <h2>5. Chemical & Gas Hazards</h2>
+            <table>
+                <tr>
+                    <th>Gas Cylinder Detections</th>
+                    <td>{{ report.chemical_and_gases.gas_cylinder_detections }}</td>
+                </tr>
+                <tr>
+                    <th>Smoke Detections</th>
+                    <td>{{ report.chemical_and_gases.smoke_detections }}</td>
+                </tr>
+                <tr>
+                    <th>Gas Leak Detection</th>
+                    <td><em>{{ report.chemical_and_gases.gas_leak_detection }}</em></td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Fire Analysis -->
+        <div class="category-card">
+            <h2>Fire Intensity & Temperature Analysis</h2>
+            <table>
+                <tr>
+                    <th>Low Intensity Fires (~500-700°C proxy)</th>
+                    <td>{{ report.fire_analysis.low_intensity_fire_count }}</td>
+                </tr>
+                <tr>
+                    <th>Medium Intensity Fires (~700-1000°C proxy)</th>
+                    <td>{{ report.fire_analysis.medium_intensity_fire_count }}</td>
+                </tr>
+                <tr>
+                    <th>High Intensity Fires (~1000°C+ proxy)</th>
+                    <td>{{ report.fire_analysis.high_intensity_fire_count }}</td>
+                </tr>
+                <tr>
+                    <th>Analysis Note</th>
+                    <td><em>{{ report.fire_analysis.note }}</em></td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- Wind Analysis -->
+        <div class="category-card">
+            <h2>Visual Wind & Motion Analysis</h2>
+            <table>
+                <tr>
+                    <th>Estimated Wind Direction</th>
+                    <td>{{ report.wind_analysis.wind_direction }}</td>
+                </tr>
+                <tr>
+                    <th>Beaufort Scale Category</th>
+                    <td>{{ report.wind_analysis.wind_beaufort_scale }}</td>
+                </tr>
+                <tr>
+                    <th>Estimation Note</th>
+                    <td><em>{{ report.wind_analysis.note }}</em></td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- 6. Water & Drainage -->
+        <div class="category-card">
+            <h2>6. Water & Drainage</h2>
+            <table>
+                <tr>
+                    <th>Flood Water Detections</th>
+                    <td>{{ report.water_and_drainage.flood_water_detections }}</td>
+                </tr>
+                <tr>
+                    <th>Waterlogged Areas (High Conf)</th>
+                    <td>{{ report.water_and_drainage.waterlogged_areas }}</td>
+                </tr>
+                <tr>
+                    <th>Fast Moving Currents</th>
+                    <td>{{ report.water_and_drainage.fast_moving_currents }}</td>
+                </tr>
+                <tr>
+                    <th>Flow Summary</th>
+                    <td>
+                        {% if report.water_and_drainage.flow_summary %}
+                            <ul>
+                                {% for item in report.water_and_drainage.flow_summary %}
+                                <li>Direction: {{ item.direction }}, Speed: {{ item.speed }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            No optical flow data captured
+                        {% endif %}
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- 7. Roads & Routes -->
+        <div class="category-card">
+            <h2>7. Roads & Safe Routes</h2>
+            <table>
+                <tr>
+                    <th>Disrupted Road Segments</th>
+                    <td><em>{{ report.roads_and_routes.disrupted_road_segments }}</em></td>
+                </tr>
+                <tr>
+                    <th>Suggested Safe Routes</th>
+                    <td>
+                        {% if report.roads_and_routes.suggested_safe_routes %}
+                            {{ report.roads_and_routes.suggested_safe_routes }}
+                        {% else %}
+                            None computed
+                        {% endif %}
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        <!-- 8. Humans & Animals -->
+        <div class="category-card">
+            <h2>8. Humans & Animals</h2>
+            <table>
+                <tr>
+                    <th>Person Count (Distinct Tracks)</th>
+                    <td>{{ report.humans_and_animals.person_count }}</td>
+                </tr>
+                <tr>
+                    <th>Animal Count (Distinct Tracks)</th>
+                    <td>{{ report.humans_and_animals.animal_count }}</td>
+                </tr>
+                <tr>
+                    <th>Behavior Classification</th>
+                    <td><em>{{ report.humans_and_animals.aggressive_behavior_flag }}</em></td>
+                </tr>
+            </table>
+        </div>
+
+        <h2>JSON Response Preview</h2>
+        <pre>{{ report_json }}</pre>
+    </div>
+</body>
+</html>

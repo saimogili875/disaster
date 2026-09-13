@@ -4,6 +4,7 @@ import os
 import sys
 import cv2
 from ultralytics import YOLO
+from fire_intensity import analyze_fire_intensity
 
 def get_class_color(label):
     """Return a distinct BGR color tuple for a given class label."""
@@ -21,7 +22,6 @@ def get_class_color(label):
     }
     if label in known_colors:
         return known_colors[label]
-    # Compute deterministic color from hash for any other classes
     h = hash(label)
     return ((h & 0xFF), ((h >> 8) & 0xFF), ((h >> 16) & 0xFF))
 
@@ -37,17 +37,14 @@ def parse_args():
 def main():
     args = parse_args()
 
-    # Load the YOLOv8 model
     print(f"Loading YOLOv8 model from '{args.model}'...")
     model = YOLO(args.model)
 
-    # Open input video
     cap = cv2.VideoCapture(args.input)
     if not cap.isOpened():
         print(f"Error: Could not open input video file '{args.input}'")
         sys.exit(1)
 
-    # Get input video properties
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS)
@@ -55,7 +52,6 @@ def main():
 
     print(f"Input Video: {args.input} ({width}x{height} @ {fps:.2f} FPS, {total_frames} total frames)")
 
-    # Create VideoWriter using mp4v codec
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(args.output, fourcc, fps, (width, height))
     if not out.isOpened():
@@ -65,6 +61,7 @@ def main():
 
     frame_count = 0
     summary = {}
+    fire_intensity_breakdown = {"low": 0, "medium": 0, "high": 0}
 
     print(f"Processing frames with confidence threshold = {args.conf}...")
 
@@ -76,10 +73,8 @@ def main():
 
             frame_count += 1
 
-            # Perform inference on current frame
             results = model(frame, conf=args.conf, verbose=False)
 
-            # Draw bounding boxes and accumulate class counts
             for result in results:
                 boxes = result.boxes.cpu().numpy()
                 for box in boxes:
@@ -88,27 +83,33 @@ def main():
                     conf_val = float(box.conf[0])
                     label = model.names[cls_id]
 
-                    # Accumulate summary detection count
                     summary[label] = summary.get(label, 0) + 1
 
-                    # Draw bounding box and label text
+                    text = f"{label} {conf_val:.2f}"
+
+                    # Fire intensity & temperature proxy estimation
+                    if label == 'fire':
+                        fire_res = analyze_fire_intensity(frame, r)
+                        level = fire_res['intensity_level']
+                        temp_proxy = fire_res['temp_estimate']
+                        fire_intensity_breakdown[level] = fire_intensity_breakdown.get(level, 0) + 1
+                        temp_short = temp_proxy.split()[0]
+                        text += f" | {level.upper()} {temp_short} (proxy)"
+
                     color = get_class_color(label)
                     cv2.rectangle(frame, (r[0], r[1]), (r[2], r[3]), color, 2)
-                    text = f"{label} {conf_val:.2f}"
                     cv2.putText(
                         frame,
                         text,
                         (r[0], max(r[1] - 10, 0)),
                         cv2.FONT_HERSHEY_SIMPLEX,
-                        0.6,
+                        0.5,
                         color,
                         2
                     )
 
-            # Write annotated frame to output video
             out.write(frame)
 
-            # Print progress every 30 frames
             if frame_count % 30 == 0 or frame_count == total_frames:
                 if total_frames > 0:
                     print(f"Frame {frame_count}/{total_frames} processed")
@@ -116,32 +117,34 @@ def main():
                     print(f"Frame {frame_count} processed")
 
     finally:
-        # Release video capture and writer cleanly
         cap.release()
         out.release()
         cv2.destroyAllWindows()
 
     print(f"\nProcessing complete! Annotated video saved to '{args.output}'.")
 
-    # Save detection summary as JSON file with _summary.json suffix
+    # Add fire intensity breakdown to output JSON summary
+    if summary.get('fire', 0) > 0:
+        summary['fire_intensity_breakdown'] = fire_intensity_breakdown
+
     summary_filename = os.path.splitext(args.output)[0] + "_summary.json"
     with open(summary_filename, 'w') as f:
         json.dump(summary, f, indent=4)
     print(f"Summary JSON saved to '{summary_filename}'.")
 
-    # Print summary as a clean console table
-    print("\n" + "=" * 35)
-    print(f"{'Class':<20} | {'Count':<10}")
-    print("-" * 35)
-    if summary:
-        for cls_name, count in sorted(summary.items(), key=lambda x: x[1], reverse=True):
-            print(f"{cls_name:<20} | {count:<10}")
-    else:
-        print(f"{'No detections':<20} | {0:<10}")
-    print("-" * 35)
-    total_detections = sum(summary.values())
-    print(f"{'Total Detections':<20} | {total_detections:<10}")
-    print("=" * 35)
+    print("\n" + "=" * 45)
+    print(f"{'Class':<25} | {'Count':<10}")
+    print("-" * 45)
+    for k, v in summary.items():
+        if k == 'fire_intensity_breakdown':
+            continue
+        print(f"{k:<25} | {v:<10}")
+    if 'fire_intensity_breakdown' in summary:
+        print("-" * 45)
+        print("Fire Intensity Breakdown:")
+        for lvl, cnt in fire_intensity_breakdown.items():
+            print(f"  - {lvl.capitalize()} Intensity: {cnt}")
+    print("=" * 45)
 
 if __name__ == '__main__':
     main()
