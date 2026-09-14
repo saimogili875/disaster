@@ -102,6 +102,18 @@
                 <img class="media-preview" src="{{ annotated_url }}" alt="Annotated Detection Output">
             {% endif %}
 
+            {% if scene_classification %}
+            <div style="margin:16px 0;padding:14px 20px;border-radius:8px;border-left:4px solid {{ scene_classification.color }};background:#f8fafc;display:flex;align-items:center;gap:14px">
+                <div style="width:48px;height:48px;border-radius:50%;background:{{ scene_classification.color }};display:flex;align-items:center;justify-content:center;color:white;font-weight:800;font-size:1.3rem;flex-shrink:0">{{ scene_classification.icon }}</div>
+                <div>
+                    <div style="font-weight:700;font-size:1rem;color:#0f172a">Scene Classification: {{ scene_classification.label }}</div>
+                    <div style="font-size:0.82rem;color:#64748b;margin-top:2px">
+                        Confidence: {{ scene_classification.confidence|floatformat:1 }}% | Method: {{ scene_classification.method }}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <h3>Detection Summary</h3>
             {% if summary %}
                 <table>

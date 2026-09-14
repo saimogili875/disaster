@@ -6,6 +6,7 @@ from django.conf import settings
 from ultralytics import YOLO
 from class_config import normalize_class_name, get_class_color, check_and_warn_unfinetuned_model
 from thermal_proxy import enhance_low_visibility
+from scene_classifier import classify_scene
 from .forms import ImageUploadForm
 from .models import Detection, Alert, Team, Mission
 
@@ -116,6 +117,10 @@ def upload_and_detect(request):
                     context['annotated_url'] = f"{settings.MEDIA_URL}results/{annotated_filename}"
                     context['summary'] = summary
                     context['is_video'] = False
+
+                    scene_result = classify_scene(image_path=upload_path)
+                    if scene_result:
+                        context['scene_classification'] = scene_result
             else:
                 # Process Video File with frame sampling + deduplication
                 SAMPLE_EVERY_N = 5
@@ -218,6 +223,15 @@ def upload_and_detect(request):
                     context['annotated_url'] = f"{settings.MEDIA_URL}results/{annotated_filename}"
                     context['summary'] = summary
                     context['is_video'] = True
+
+                    cap2 = cv2.VideoCapture(upload_path)
+                    if cap2.isOpened():
+                        ret2, first_frame = cap2.read()
+                        if ret2:
+                            scene_result = classify_scene(cv2_frame=first_frame)
+                            if scene_result:
+                                context['scene_classification'] = scene_result
+                        cap2.release()
 
         context['form'] = form
 

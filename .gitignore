@@ -9,6 +9,7 @@ db.sqlite3-journal
 
 # Model weights (download or train; don't commit 6MB+ binaries)
 *.pt
+*.pth
 *.onnx
 runs/
 

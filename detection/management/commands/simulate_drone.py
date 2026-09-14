@@ -97,26 +97,56 @@ FLOW_SPEEDS = ["slow", "moderate", "fast"]
 WIND_DIRECTIONS = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"]
 
 
-def _generate_flight_path(center_lat, center_lon, grid_size=0.004, legs=4):
-    """Generate a serpentine grid flight path around a center point."""
-    points = []
-    start_lat = center_lat - (grid_size * legs / 2)
-    start_lon = center_lon - (grid_size * legs / 2)
+HYDERABAD_LANDMARKS = [
+    # (lat, lon, name, scenario_index)
+    # Scenario 0: Urban Fire, 1: Flood, 2: Earthquake, 3: Mixed, 4: Clear
+    (17.3850, 78.4867, "Charminar Area", 0),
+    (17.3950, 78.4740, "Nizam's Museum / Purani Haveli", 2),
+    (17.4000, 78.4800, "Osmania General Hospital Road", 0),
+    (17.3616, 78.4747, "Falaknuma Palace Area", 3),
+    (17.4375, 78.4483, "Hussain Sagar Lake Edge", 1),
+    (17.4400, 78.4980, "Secunderabad Railway Station", 2),
+    (17.3984, 78.4861, "Mecca Masjid / High Court", 3),
+    (17.4260, 78.4530, "Necklace Road / NTR Gardens", 1),
+    (17.4156, 78.4347, "KBR National Park Perimeter", 4),
+    (17.3780, 78.4920, "Salar Jung Museum Area", 0),
+    (17.4480, 78.3910, "HITEC City / Cyber Towers", 4),
+    (17.4440, 78.3490, "Gachibowli Stadium Area", 4),
+    (17.3520, 78.5340, "LB Nagar / NH65 Junction", 3),
+    (17.4240, 78.5500, "Uppal Flyover Area", 2),
+    (17.3900, 78.5100, "Chaderghat Bridge", 1),
+    (17.4100, 78.4700, "Abids / GPO Area", 0),
+    (17.4310, 78.4200, "Banjara Hills Road No. 12", 3),
+    (17.4560, 78.3620, "Kondapur / ORR Junction", 4),
+    (17.3700, 78.4800, "Afzalgunj Bus Station", 2),
+    (17.4050, 78.4500, "Lakdi-ka-pul Railway Bridge", 1),
+]
 
-    for row in range(legs):
-        cols = range(legs * 3) if row % 2 == 0 else range(legs * 3 - 1, -1, -1)
-        for col in cols:
-            lat = start_lat + row * grid_size
-            lon = start_lon + col * (grid_size / 3)
-            lat += random.uniform(-0.0003, 0.0003)
-            lon += random.uniform(-0.0003, 0.0003)
-            points.append((round(lat, 6), round(lon, 6)))
+
+def _generate_flight_path(center_lat, center_lon, grid_size=0.004, legs=4):
+    """Generate a flight path through real Hyderabad landmarks with connecting waypoints."""
+    points = []
+
+    for i, (lat, lon, name, scenario_idx) in enumerate(HYDERABAD_LANDMARKS):
+        points.append((round(lat, 6), round(lon, 6), scenario_idx, name))
+
+        for _ in range(3):
+            jitter_lat = lat + random.uniform(-0.001, 0.001)
+            jitter_lon = lon + random.uniform(-0.001, 0.001)
+            points.append((round(jitter_lat, 6), round(jitter_lon, 6), scenario_idx, name))
+
+        if i < len(HYDERABAD_LANDMARKS) - 1:
+            next_lat, next_lon = HYDERABAD_LANDMARKS[i + 1][0], HYDERABAD_LANDMARKS[i + 1][1]
+            mid_lat = (lat + next_lat) / 2 + random.uniform(-0.001, 0.001)
+            mid_lon = (lon + next_lon) / 2 + random.uniform(-0.001, 0.001)
+            transit_scenario = random.choice([3, 4])
+            points.append((round(mid_lat, 6), round(mid_lon, 6), transit_scenario, "Transit"))
 
     return points
 
 
 def _pick_scenario_for_position(position_index, total_positions):
-    """Assign disaster scenarios based on position in flight path."""
+    """Fallback — used only if landmark data not available."""
     progress = position_index / max(1, total_positions - 1)
 
     if progress < 0.15:
@@ -183,14 +213,20 @@ class Command(BaseCommand):
         total_points = len(path)
         delay = duration / max(1, total_points) if options['realtime'] else 0
 
-        self.stdout.write(f"Flight path: {total_points} waypoints over {center_lat}, {center_lon}")
+        self.stdout.write(f"Flight path: {total_points} waypoints across {len(HYDERABAD_LANDMARKS)} Hyderabad landmarks")
         self.stdout.write(f"Simulating {'with real-time delays' if options['realtime'] else 'instant batch'}...")
 
         total_detections = 0
         zones_created = set()
+        current_landmark = ""
 
-        for idx, (lat, lon) in enumerate(path):
-            scenario = _pick_scenario_for_position(idx, total_points)
+        for idx, waypoint in enumerate(path):
+            lat, lon, scenario_idx, landmark_name = waypoint
+            scenario = DISASTER_SCENARIOS[scenario_idx]
+
+            if landmark_name != current_landmark and landmark_name != "Transit":
+                current_landmark = landmark_name
+                self.stdout.write(f"  Flying over: {landmark_name} ({scenario['name']})")
 
             num_detections = random.randint(1, min(5, len(scenario["classes"])))
             selected = random.sample(scenario["classes"], num_detections)
@@ -265,11 +301,16 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("=" * 50))
         # Create demo rescue teams
         TEAM_DEFS = [
-            {"name": "Alpha Team", "members": 5, "status": "en_route"},
-            {"name": "Bravo Team", "members": 4, "status": "on_site"},
-            {"name": "Charlie Team", "members": 6, "status": "standby"},
-            {"name": "Delta Team", "members": 3, "status": "returning"},
-            {"name": "Echo Team", "members": 4, "status": "standby"},
+            {"name": "Alpha Team — Charminar", "members": 5, "status": "en_route",
+             "base_lat": 17.3610, "base_lon": 78.4740},
+            {"name": "Bravo Team — Secunderabad", "members": 4, "status": "on_site",
+             "base_lat": 17.4400, "base_lon": 78.4980},
+            {"name": "Charlie Team — HITEC City", "members": 6, "status": "standby",
+             "base_lat": 17.4480, "base_lon": 78.3910},
+            {"name": "Delta Team — Hussain Sagar", "members": 3, "status": "returning",
+             "base_lat": 17.4260, "base_lon": 78.4530},
+            {"name": "Echo Team — LB Nagar", "members": 4, "status": "standby",
+             "base_lat": 17.3520, "base_lon": 78.5340},
         ]
 
         all_zones = list(Zone.objects.all())
@@ -279,8 +320,8 @@ class Command(BaseCommand):
         missions_created = 0
 
         for i, tdef in enumerate(TEAM_DEFS):
-            team_lat = center_lat + random.uniform(-0.008, 0.008)
-            team_lon = center_lon + random.uniform(-0.008, 0.008)
+            team_lat = tdef["base_lat"] + random.uniform(-0.002, 0.002)
+            team_lon = tdef["base_lon"] + random.uniform(-0.002, 0.002)
 
             assigned_zone = None
             if tdef["status"] in ("en_route", "on_site") and all_zones:
